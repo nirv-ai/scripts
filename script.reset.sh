@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
 
+###########################
+# resets a container & image
+# for something less destructive, use refresh script
+###########################
+
 set -e
 
 SERVICE_PREFIX=${SERVICE_PREFIX:-nirvai}
+POSTGRES_VOL_NAME=$SERVICE_PREFIX-core-postgres
 
 create_volumes() {
-  local POSTGRES_VOL=$SERVICE_PREFIX-core-postgres
-
-  docker volume create $POSTGRES_VOL
+  docker volume create $POSTGRES_VOL_NAME
 }
 
 build() {
@@ -31,6 +35,11 @@ core*)
     echo "container for service $1 already dead"
   else
     docker container rm $SERVICE_PREFIX-$1
+    if [[ $1 == *"postgres" ]]; then
+      echo "recreating $1 volumes"
+      docker volume rm $POSTGRES_VOL_NAME
+      create_volumes
+    fi
   fi
   docker container prune -f
   echo "restarting server $1"
