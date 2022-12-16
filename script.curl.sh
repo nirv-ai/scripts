@@ -2,6 +2,9 @@
 
 set -e
 
+# uses port based routing
+DEFAULT_VAULT='https://dev.nirv.ai:8200'
+# all other services use path based routing
 DEFAULT_TARGET='https://dev.nirv.ai:8080'
 DEFAULT_ORIGIN='http://poop.com'
 
@@ -10,7 +13,7 @@ USE_ORIGIN="${CURL_ORIGIN:-$DEFAULT_ORIGIN}"
 
 case $1 in
 vault)
-  curl ${USE_TARGET}/vault/v1/sys/init
+  curl ${DEFAULT_VAULT}/v1/sys/init
   ;;
 bff)
   curl ${USE_TARGET}/bff/v1/player/p/nirvai | jq
