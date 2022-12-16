@@ -2,15 +2,18 @@
 
 set -e
 
-DEFAULT_TARGET='https://dev.nirv.ai:8080/v1/'
+DEFAULT_TARGET='https://dev.nirv.ai:8080'
 DEFAULT_ORIGIN='http://poop.com'
 
 USE_TARGET="${CURL_TARGET:-$DEFAULT_TARGET}"
 USE_ORIGIN="${CURL_ORIGIN:-$DEFAULT_ORIGIN}"
 
 case $1 in
+vault)
+  curl ${USE_TARGET}/vault/v1/sys/init
+  ;;
 bff)
-  curl ${USE_TARGET}/v1/player/p/nirvai | jq
+  curl ${USE_TARGET}/bff/v1/player/p/nirvai | jq
   ;;
 cors)
   curl -H "Origin: $USE_ORIGIN" \
