@@ -50,7 +50,8 @@ core*)
 *)
   echo 'resetting infrastructure'
   docker compose down
-  dk_rm_all
+  dk_rm_all || true
+  create_volumes
   build
   up
   ;;
