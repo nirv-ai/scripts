@@ -45,6 +45,7 @@ core*)
   echo "restarting server $1"
   docker compose build $1
   docker compose up -d $1 --remove-orphans
+  docker compose convert $1
   ;;
 *)
   echo 'resetting infrastructure'

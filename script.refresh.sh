@@ -2,6 +2,11 @@
 
 set -e
 
+###########################
+# refreshes a container
+# for something more destructive, use reset script
+###########################
+
 SERVICE_PREFIX=${SERVICE_PREFIX:-nirvai}
 
 if [ "$#" -eq 0 ]; then
@@ -22,4 +27,5 @@ else
 
 fi
 
+docker compose convert $1
 dk_ps
