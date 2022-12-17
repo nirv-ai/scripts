@@ -17,26 +17,26 @@ invalid_request() {
 }
 
 vault_curl() {
-  curl -v --url $1 ${@:2}
+  curl -v --url $1 "${@:2}" | jq
 }
 vault_curl_auth() {
-  vault_curl $1 -H "$TOKEN_HEADER"
+  vault_curl $1 -H "$TOKEN_HEADER" "${@:2}"
 }
 vault_list() {
   vault_curl_auth $1 -X LIST
 }
 vault_post_data() {
-  vault_curl_auth $2 --data $1
+  vault_curl_auth $2 --data "$1"
 }
 vault_post_data_no_auth() {
-  vault_curl $2 --data $1 -X POST
+  vault_curl $2 --data "$1"
 }
 vault_put_data() {
-  vault_curl_auth $2 -X PUT --data $1
+  vault_curl_auth $2 -X PUT --data "$1"
 }
 
 data_type_only() {
-  data=$(
+  local data=$(
     jq -n -c \
       --arg type $1 \
       '{ "type":$type }'
@@ -45,7 +45,7 @@ data_type_only() {
 }
 
 data_login() {
-  data=$(
+  local data=$(
     jq -n -c \
       --arg role_id $1 \
       --arg secret_id $2 \
@@ -55,7 +55,7 @@ data_login() {
 }
 
 data_policies_only() {
-  data=$(
+  local data=$(
     jq -n -c \
       --arg policy $1 \
       '{ "policies":$policy }'
@@ -66,39 +66,40 @@ data_policies_only() {
 case $1 in
 enable)
   case $2 in
-  secret | approle)
+  secret | approle | database)
     # eg: enable secret kv-v2
     # eg: enable approle approle
-    echo -e "enabling secret engine: $3"
-
+    # eg enable database database
     data=$(data_type_only $3)
-    url=$(
-      [[ "$2" == secret ]] &&
+    echo -e "enabling secret engine: $2 of $data"
+
+    URL=$(
+      [[ "$2" == secret || "$2" == database ]] &&
         echo "sys/mounts/$2" ||
         echo "sys/auth/$2"
     )
-    vault_post_data $data "$ADDR/$url" | jq
+    vault_post_data $data "$ADDR/$URL"
     ;;
   *) invalid_request ;;
   esac
   ;;
 list-secrets) # doesnt work
-  vault_list "$ADDR/secret/data/" | jq
+  vault_list "$ADDR/secret/data/"
   ;;
 create)
   case $2 in
   approle-secret)
     # eg: create approle-secret bff
-    echo "creating secret-id for approle $3"
+    echo -e "creating secret-id for approle $3"
 
-    vault_curl_auth "$ADDR/auth/approle/role/$3/secret-id" -X POST | jq
+    vault_curl_auth "$ADDR/auth/approle/role/$3/secret-id" -X POST
     ;;
   approle)
     # eg: create approle someName role1,role2,role3
     data=$(data_policies_only $4)
-    echo "creating approle $3 with policies $data"
+    echo -e "creating approle $3 with policies $data"
 
-    vault_post_data $data "$ADDR/auth/approle/role/$3" | jq
+    vault_post_data $data "$ADDR/auth/approle/role/$3"
     ;;
   *) invalid_request ;;
   esac
@@ -116,24 +117,26 @@ get)
     ;;
   secret)
     # eg: get secret secret/foo
-    vault_curl_auth "$ADDR/secret/data/$3" | jq
+    vault_curl_auth "$ADDR/secret/data/$3"
     ;;
   status)
     # eg get status
-    vault_curl "$ADDR/sys/health" | jq
+    vault_curl "$ADDR/sys/health"
     ;;
   creds)
     # eg get creds roleId secretId
     data=$(data_login $3 $4)
-    echo "getting creds for $3 with $data"
-    vault_post_data_no_auth $data "$ADDR/auth/approle/login" | jq
+    echo -e "getting creds for $3 with $data"
+
+    vault_post_data_no_auth $data "$ADDR/auth/approle/login"
     ;;
   approle)
     case $3 in
     id)
       # eg: get approle id bff
-      echo "getting id for approle $4"
-      vault_curl_auth "$ADDR/auth/approle/role/$4/role-id" | jq
+      echo -e "getting id for approle $4"
+
+      vault_curl_auth "$ADDR/auth/approle/role/$4/role-id"
       ;;
     *) invalid_request ;;
     esac
@@ -142,7 +145,7 @@ get)
   esac
   ;;
 help)
-  vault_curl_auth "$ADDR/$2?help=1" | jq
+  vault_curl_auth "$ADDR/$2?help=1"
   ;;
 *) invalid_request ;;
 esac
