@@ -1,6 +1,7 @@
 # NIRVAI SCRIPTS
 
 - useful scripts
+- additional readme coming soon
 
 ## TLDR
 
@@ -23,14 +24,17 @@
 ./script.vault.sh cmd
 
 ## cmds
-### e.g. kv-v2
+### enable a secret engine e.g. kv-v2
 enable secret secretEngineType
 
-### e.g. approle
+### enable approle engine e.g. approle
 enable approle approleType
 
 ### list all approles
 list approles
+
+### list enabled secrets engines
+list secret-engines
 
 ### create a secret-id for roleName
 create approle-secret roleName
@@ -38,11 +42,17 @@ create approle-secret roleName
 ### upsert approle appRoleName with a list of attached policies
 create approle appRoleName pol1,polX
 
+### create kv2 secret(s) at secretPath
+#### dont prepend `secret/` to secretPath
+#### e.g. create secret kv2 poo/in/ur/eye '{"a": "b", "c": "d"}'
+create secret kv2 secretPath jsonString
+
 ### get dynamic postgres creds for database role dbRoleName
 get postgres creds dbRoleName
 
-### get the secret (kv-v2) at the given path
-get secret secret/poop
+### get the secret (kv-v2) at the given path, e.g. foo
+#### dont prepend `secret/` to path
+get secret secretPath
 
 ### get the status (sys/healthb) of the vault server
 get status

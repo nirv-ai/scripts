@@ -3,6 +3,8 @@
 # @see https://curl.se/docs/manpage.html
 # @see https://stedolan.github.io/jq/manual/
 # @see https://developer.hashicorp.com/vault/api-docs/secret/kv/kv-v2
+# via the CLI you can append `--output-policy`
+## to see the policy needed to execute a cmd
 
 set -eu
 
@@ -24,6 +26,9 @@ vault_curl_auth() {
 }
 vault_list() {
   vault_curl_auth $1 -X LIST
+}
+vault_list_get() {
+  vault_curl_auth $1
 }
 vault_post_data() {
   vault_curl_auth $2 --data "$1"
@@ -87,17 +92,34 @@ enable)
   *) invalid_request ;;
   esac
   ;;
-list) # doesnt work
+list)
   case $2 in
+  secrets) # doesnt work
+    vault_list "$ADDR/secret/data/$3"
+    ;;
+  secret-engines)
+    vault_list_get "$ADDR/sys/mounts"
+    ;;
   approles)
     vault_list "$ADDR/auth/approle/role"
-
     ;;
   *) invalid_request ;;
   esac
   ;;
 create)
   case $2 in
+  secret)
+    case $3 in
+    kv2)
+      # eg create secret kv2 poo/in/ur/eye '{"a": "b", "c": "d"}'
+      data="{\"data\": $5 }"
+      echo -e "creating secret at $4 with $data"
+
+      vault_post_data "$data" "$ADDR/secret/data/$4"
+      ;;
+    *) invalid_request ;;
+    esac
+    ;;
   approle-secret)
     # eg: create approle-secret bff
     echo -e "creating secret-id for approle $3"
