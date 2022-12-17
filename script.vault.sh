@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
 
-# not sure how far i'll be going with this script
-# as i fixed the ssl issue on the vault server so i can use the cli again
-# as well as finding the very small button in the top right corner
-# of the vault UI that enables using the CLI from the browser ;)
+# @see https://developer.hashicorp.com/vault/api-docs/secret/kv/kv-v2
 
 set -eu
 
@@ -36,6 +33,16 @@ data_type_only() {
     jq -n -c \
       --arg type $1 \
       '{ "type":$type }'
+  )
+  echo $data
+}
+
+data_login() {
+  data=$(
+    jq -n -c \
+      --arg role_id $1 \
+      --arg secret_id $2 \
+      '{ "role_id": $role_id, "secret_id": $secret_id }'
   )
   echo $data
 }
@@ -95,6 +102,12 @@ create)
   ;;
 get)
   case $2 in
+  creds)
+    # eg get creds roleId secretId
+    echo "getting creds for $3"
+    data=$(data_login $3 $4)
+    vault_post $data "$ADDR/auth/approle/login" | jq
+    ;;
   approle)
     case $3 in
     id)
