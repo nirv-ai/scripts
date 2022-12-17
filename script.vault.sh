@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+# @see https://curl.se/docs/manpage.html
 # @see https://developer.hashicorp.com/vault/api-docs/secret/kv/kv-v2
 
 set -eu
@@ -8,24 +9,20 @@ ADDR="${VAULT_ADDR:?-not set}/v1"
 TOKEN=${VAULT_TOKEN:?-token not set}
 TOKEN_HEADER="X-Vault-Token: $TOKEN"
 
-vault_post() {
-  curl -v -H "$TOKEN_HEADER" --data $1 $2
+vault_curl() {
+  curl -v --url $1
 }
-
-vault_post_no_data() {
-  curl -v -H "$TOKEN_HEADER" $1
+vault_curl_auth() {
+  vault_curl $1 -H "$TOKEN_HEADER"
 }
-
-vault_put() {
-  curl -v -H "$TOKEN_HEADER" -X PUT --data $1 $2
-}
-
-vault_get() {
-  curl -v -H "$TOKEN_HEADER" $1
-}
-
 vault_list() {
-  curl -v -H "$TOKEN_HEADER" -X LIST $1
+  vault_curl_auth $1 -X LIST
+}
+vault_post_data() {
+  vault_curl_auth $2 --data $1
+}
+vault_put_data() {
+  vault_curl_auth $2 -X PUT --data $1
 }
 
 data_type_only() {
@@ -70,7 +67,7 @@ enable)
     )
     echo "data is: $data"
     echo "url is: $url"
-    vault_post $data "$ADDR/$url" | jq
+    vault_post_data $data "$ADDR/$url" | jq
     ;;
   esac
   ;;
@@ -78,7 +75,7 @@ secret)
   case $2 in
   get)
     # eg: secret get secret/foo
-    vault_get "$ADDR/secret/data/$3" | jq
+    vault_curl_auth "$ADDR/secret/data/$3" | jq
     ;;
   esac
   ;;
@@ -90,44 +87,48 @@ create)
   approle-secret)
     # eg: create approle-secret bff
     echo "creating secret-id for approle $3"
-    vault_post_no_data "$ADDR/auth/approle/role/$3/secret-id" | jq
+    vault_curl_auth "$ADDR/auth/approle/role/$3/secret-id" -X POST | jq
     ;;
   approle)
     # eg: create approle someName role1,role2,role3
     data=$(data_policies_only $4)
     echo "creating approle $3 with policies $data"
-    vault_post $data "$ADDR/auth/approle/role/$3"
+    vault_post_data $data "$ADDR/auth/approle/role/$3"
     ;;
   esac
   ;;
 get)
   case $2 in
+  status)
+    # eg get status
+    vault_curl "$ADDR/status" | jq
+    ;;
   creds)
     # eg get creds roleId secretId
-    echo "getting creds for $3"
     data=$(data_login $3 $4)
-    vault_post $data "$ADDR/auth/approle/login" | jq
+    echo "getting creds for $3 with $data"
+    vault_post_data $data "$ADDR/auth/approle/login" | jq
     ;;
   approle)
     case $3 in
     id)
       # eg: get approle id bff
       echo "getting id for approle $4"
-      vault_get "$ADDR/auth/approle/role/$4/role-id" | jq
+      vault_curl_auth "$ADDR/auth/approle/role/$4/role-id" | jq
       ;;
     esac
     ;;
   esac
   ;;
 help)
-  vault_get "$ADDR/$2?help=1" | jq
+  vault_curl_auth "$ADDR/$2?help=1" | jq
   ;;
 approle)
   case $2 in
   login)
     # eg: approle login roleId secretId
     echo "maching logging in with $roleId"
-    # vault_post "$ADDR/v1/auth/approle/login"
+    # vault_post_data "$ADDR/v1/auth/approle/login"
     ;;
   esac
   ;;
