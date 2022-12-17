@@ -36,6 +36,9 @@ list approles
 ### list enabled secrets engines
 list secret-engines
 
+### list provisioned keys for a postgres role
+list postgres leases dbRoleName
+
 ### create a secret-id for roleName
 create approle-secret roleName
 

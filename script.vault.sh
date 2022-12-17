@@ -39,6 +39,9 @@ vault_post_data_no_auth() {
 vault_put_data() {
   vault_curl_auth $2 -X PUT --data "$1"
 }
+vault_patch_data() {
+  vault_curl_auth $2 -X PATCH --data "$1"
+}
 
 data_type_only() {
   local data=$(
@@ -76,8 +79,8 @@ case $1 in
 enable)
   case $2 in
   secret | approle | database)
-    # eg: enable secret kv-v2
-    # eg: enable approle approle
+    # eg enable secret kv-v2
+    # eg enable approle approle
     # eg enable database database
     data=$(data_type_only $3)
     echo -e "enabling secret engine: $2 of $data"
@@ -103,7 +106,17 @@ list)
   approles)
     vault_list "$ADDR/auth/approle/role"
     ;;
-  *) invalid_request ;;
+  postgres)
+    case $3 in
+    leases)
+      # eg list postgres leases bff
+      echo -e "listing provisioned leases for postgres role $4"
+
+      vault_list "$ADDR/sys/leases/lookup/database/creds/$4"
+      ;;
+    *) invalid_request ;;
+    esac
+    ;;
   esac
   ;;
 create)
