@@ -38,8 +38,8 @@ create approle-secret roleName
 ### create a new approle roleName with a list of attached policies
 create approle roleName pol1,polX
 
-### get dynamic postgres creds for roleName
-get db creds roleName
+### get dynamic postgres creds for database role roleName
+get postgres creds dbRoleName
 
 ### get the secret (kv-v2) at the given path
 get secret secret/poop
@@ -47,7 +47,7 @@ get secret secret/poop
 ### get the status (sys/healthb) of the vault server
 get status
 
-### get credentials for an approle
+### get vault credentials for an approle
 get creds roleId secretId
 
 ### get the approle role_id for roleName
