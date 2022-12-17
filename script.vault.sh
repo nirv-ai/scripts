@@ -58,7 +58,11 @@ data_policies_only() {
   local data=$(
     jq -n -c \
       --arg policy $1 \
-      '{ "policies":$policy }'
+      '{
+        "token_policies": [ $policy ],
+        "token_ttl": "24h",
+        "token_max_ttl": "24h"
+        }'
   )
   echo $data
 }
@@ -103,7 +107,7 @@ create)
   approle)
     # eg: create approle someName role1,role2,role3
     data=$(data_policies_only $4)
-    echo -e "creating approle $3 with policies $data"
+    echo -e "upserting approle $3 with policies $data"
 
     vault_post_data $data "$ADDR/auth/approle/role/$3"
     ;;
@@ -138,6 +142,12 @@ get)
     ;;
   approle)
     case $3 in
+    info)
+      # eg get approle info bff
+      echo -e "getting info for approle $4"
+
+      vault_curl_auth "$ADDR/auth/approle/role/$4"
+      ;;
     id)
       # eg: get approle id bff
       echo -e "getting id for approle $4"

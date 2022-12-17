@@ -35,8 +35,8 @@ list approles
 ### create a secret-id for roleName
 create approle-secret roleName
 
-### create a new approle roleName with a list of attached policies
-create approle roleName pol1,polX
+### upsert approle appRoleName with a list of attached policies
+create approle appRoleName pol1,polX
 
 ### get dynamic postgres creds for database role dbRoleName
 get postgres creds dbRoleName
@@ -50,8 +50,11 @@ get status
 ### get vault credentials for an approle
 get creds roleId secretId
 
+### get all properties associated with an approle
+get approle info appRoleName
+
 ### get the approle role_id for roleName
-get approle id roleName
+get approle id appRoleName
 
 ### get the openapi spec for some path
 help some/path/
