@@ -29,8 +29,8 @@ enable secret secretEngineType
 ### e.g. approle
 enable approle approleType
 
-### doesnt work, need to find the correct path
-list-secrets
+### list all approles
+list approles
 
 ### create a secret-id for roleName
 create approle-secret roleName
@@ -38,7 +38,7 @@ create approle-secret roleName
 ### create a new approle roleName with a list of attached policies
 create approle roleName pol1,polX
 
-### get dynamic postgres creds for database role roleName
+### get dynamic postgres creds for database role dbRoleName
 get postgres creds dbRoleName
 
 ### get the secret (kv-v2) at the given path

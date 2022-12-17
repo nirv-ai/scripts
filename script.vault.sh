@@ -83,8 +83,14 @@ enable)
   *) invalid_request ;;
   esac
   ;;
-list-secrets) # doesnt work
-  vault_list "$ADDR/secret/data/"
+list) # doesnt work
+  case $2 in
+  approles)
+    vault_list "$ADDR/auth/approle/role"
+
+    ;;
+  *) invalid_request ;;
+  esac
   ;;
 create)
   case $2 in
@@ -109,8 +115,8 @@ get)
   postgres)
     case $3 in
     creds)
-      echo -e "getting postgres creds for $4"
-
+      echo -e "getting postgres creds for dbRole $4"
+      vault_curl_auth "$ADDR/database/creds/$4"
       ;;
     *) invalid_request ;;
     esac
