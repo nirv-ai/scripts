@@ -101,7 +101,7 @@ get)
   case $2 in
   status)
     # eg get status
-    vault_curl "$ADDR/status" | jq
+    vault_curl "$ADDR/sys/health" | jq
     ;;
   creds)
     # eg get creds roleId secretId
