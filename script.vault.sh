@@ -1,12 +1,18 @@
 #!/usr/bin/env bash
 
+# useful for:
+## verifying endpoints before implementing in core
+## interacting with vault without execing into a container or browser
+## all cmds are something like: ./script.vault.sh do this thing with this data
+
 # @see https://curl.se/docs/manpage.html
+# @see https://stedolan.github.io/jq/manual/
 # @see https://developer.hashicorp.com/vault/api-docs/secret/kv/kv-v2
 
 set -eu
 
-ADDR="${VAULT_ADDR:?-not set}/v1"
-TOKEN=${VAULT_TOKEN:?-token not set}
+ADDR="${VAULT_ADDR:?VAULT_ADDR not set: exiting}/v1"
+TOKEN="${VAULT_TOKEN:?VAULT_TOKEN not set: exiting}"
 TOKEN_HEADER="X-Vault-Token: $TOKEN"
 
 vault_curl() {
