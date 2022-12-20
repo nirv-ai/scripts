@@ -122,7 +122,7 @@ run)
 stop)
   name=${2:-""}
   if [[ -z $name ]]; then
-    echo -e 'syntax: `quit jobName`'
+    echo -e 'syntax: `stop jobName`'
     exit 1
   fi
   echo -e "stopping job $name"
