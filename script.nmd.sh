@@ -49,7 +49,8 @@ get)
 
   case $2 in
   status)
-    cmdhelp='get status of what? node|all|job|team'
+    opts='team|node|all|loc|dep|job'
+    cmdhelp="get status of what? $opts"
     ofwhat=${3:-""}
     if [[ -z $ofwhat ]]; then
       echo -e $cmdhelp
@@ -98,7 +99,7 @@ get)
       echo -e "getting status of $name"
       nmd job status $name
       ;;
-    *) echo -e "team|node|all|job|loc|dep" ;;
+    *) echo -e $ cmdhelp ;;
     esac
     ;;
   loc)
@@ -128,7 +129,9 @@ get)
 
     echo -e "creating job plan for $name"
     nmd job plan "$name.nomad"
-    echo -e 'issues with get plan? make sure to `run job jobName` first'
+    echo ""
+    echo -e "to use this script to submit the job, execute:"
+    echo -e '`run jobName indexNumber`'
     ;;
   *) echo -e $gethelp ;;
   esac
