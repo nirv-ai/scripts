@@ -40,7 +40,7 @@ create)
   esac
   ;;
 get)
-  gethelp='get status|loc|loc-logs|plan'
+  gethelp='get status|logs|plan'
   cmdname=${2:-""}
   if [[ -z $cmdname ]]; then
     echo -e $gethelp
@@ -102,18 +102,15 @@ get)
     *) echo -e $cmdhelp ;;
     esac
     ;;
-  loc)
-    id=${3:-""}
-    if [[ -z $id ]]; then
-      echo -e "syntax: get loc locId"
+  logs)
+    name=${3:-""}
+    id=${4:-""}
+    if [[ -z $name || -z id ]]; then
+      echo -e 'syntax: `get logs taskName allocId`'
       exit 1
     fi
-    echo -e "checking allocation for id $3"
-    nmd alloc status $3
-    ;;
-  loc-logs)
-    echo -e "fetching task $3 logs for allocation id $2 "
-    nmd alloc logs $2 $3
+    echo -e "fetching logs for task $name in allocation $id"
+    nmd alloc logs $id $name
     ;;
   plan)
     name=${3:-""}
@@ -157,7 +154,7 @@ run)
   fi
   echo -e "running job $name at index $index"
   echo -e '\t job failures? get the allocation id from the job status'
-  echo -e '\t execute: get status jobName'
+  echo -e '\t execute: get status job jobName'
   echo -e '\t execute: get status loc allocId\n\n'
   nmd job run -check-index $index $name.nomad
   ;;
