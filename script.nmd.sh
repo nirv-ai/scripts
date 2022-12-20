@@ -48,10 +48,23 @@ get)
 
   case $2 in
   status)
+    cmdhelp='get status of what? node|all|job|'
+    ofwhat=${3:-""}
+    if [[ -z $ofwhat ]]; then
+      echo -e $cmdhelp
+      exit 1
+    fi
     case $3 in
     node) nmd node status ;;
     all) nmd status ;;
-    job) nmd job status $4 ;;
+    job)
+      name=${4:-""}
+      if [[ -z $name ]]; then
+        echo 'syntax: `get status job jobName`'
+        exit 1
+      fi
+      nmd job status $name
+      ;;
     *) echo -e "node|all|job" ;;
     esac
     ;;
