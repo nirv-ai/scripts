@@ -110,7 +110,7 @@ get)
       exit 1
     fi
     echo -e "fetching logs for task $name in allocation $id"
-    nmd alloc logs $id $name
+    nmd alloc logs -f $id $name
     ;;
   plan)
     name=${3:-""}
