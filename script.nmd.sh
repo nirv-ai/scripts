@@ -80,6 +80,15 @@ get)
       echo -e "getting status of allocation: $id"
       nmd status $id
       ;;
+    dep)
+      id=${4:-""}
+      if [[ -z $id ]]; then
+        echo 'syntax: `get status dep deployId`'
+        exit 1
+      fi
+      echo -e "getting status of deployment: $id"
+      nmd status $id
+      ;;
     job)
       name=${4:-""}
       if [[ -z $name ]]; then
@@ -89,7 +98,7 @@ get)
       echo -e "getting status of $name"
       nmd job status $name
       ;;
-    *) echo -e "team|node|all|job|loc" ;;
+    *) echo -e "team|node|all|job|loc|dep" ;;
     esac
     ;;
   loc)
