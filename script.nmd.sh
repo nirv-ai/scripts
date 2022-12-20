@@ -110,5 +110,14 @@ run)
   echo -e "running job $name at index $index"
   nmd job run -check-index $index $name.nomad
   ;;
+stop)
+  name=${2:-""}
+  if [[ -z $name ]]; then
+    echo -e 'syntax: `quit jobName`'
+    exit 1
+  fi
+  echo -e "stopping job $name"
+  nmd job stop $name
+  ;;
 *) echo -e $nmdhelp ;;
 esac
