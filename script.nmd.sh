@@ -79,7 +79,7 @@ get)
         exit 1
       fi
       echo -e "getting status of allocation: $id"
-      nmd status $id
+      nmd alloc status $id
       ;;
     dep)
       id=${4:-""}
@@ -99,7 +99,7 @@ get)
       echo -e "getting status of $name"
       nmd job status $name
       ;;
-    *) echo -e $ cmdhelp ;;
+    *) echo -e $cmdhelp ;;
     esac
     ;;
   loc)
@@ -128,10 +128,9 @@ get)
     fi
 
     echo -e "creating job plan for $name"
+    echo -e "\tto use this script to submit the job"
+    echo -e '\texecute: `run jobName indexNumber`'
     nmd job plan "$name.nomad"
-    echo ""
-    echo -e "to use this script to submit the job, execute:"
-    echo -e '`run jobName indexNumber`'
     ;;
   *) echo -e $gethelp ;;
   esac
@@ -157,6 +156,9 @@ run)
     exit $?
   fi
   echo -e "running job $name at index $index"
+  echo -e '\t job failures? get the allocation id from the job status'
+  echo -e '\t execute: get status jobName'
+  echo -e '\t execute: get status loc allocId\n\n'
   nmd job run -check-index $index $name.nomad
   ;;
 stop)
