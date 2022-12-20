@@ -26,15 +26,16 @@ team)
 create)
   case $2 in
   job)
-    jobname=${3:-""}
-    if [[ -z $jobname ]]; then
+    name=${3:-""}
+    if [[ -z $name ]]; then
       echo 'syntax: `create job jobName`'
       exit 1
     fi
 
     echo -e "creating new job $3.nomad in the current dir"
     nmd job init -short "$3.nomad"
-    sed -i "/job \"example\"/c\job \"$name\" {" ./$name.nomad
+    echo -e "updating job name in $name.nomad"
+    sed -i "/job \"example\"/c\job \"$name\" {" "./$name.nomad"
     ;;
   *) echo -e "job ..." ;;
   esac
