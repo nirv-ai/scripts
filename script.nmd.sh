@@ -34,6 +34,7 @@ create)
 
     echo -e "creating new job $3.nomad in the current dir"
     nmd job init -short "$3.nomad"
+    sed -i "/job \"example\"/c\job \"$name\" {" ./$name.nomad
     ;;
   *) echo -e "job ..." ;;
   esac
