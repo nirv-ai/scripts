@@ -79,7 +79,7 @@ get)
         exit 1
       fi
       echo -e "getting status of allocation: $id"
-      nmd alloc status $id
+      nmd alloc status -verbose -stats $id
       ;;
     dep)
       id=${4:-""}
