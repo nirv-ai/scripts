@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# the UI is available at http://localhost:4646
+# nomad doesnt work well with docker desktop, remove it
+
 set -eu
 
 nmd() {
@@ -18,10 +21,6 @@ start)
     ;;
   *) echo -e "dev| ..." ;;
   esac
-  ;;
-team)
-  echo -e "retrieving nomad server agents"
-  nmd server members -detailed
   ;;
 create)
   case $2 in
@@ -50,13 +49,17 @@ get)
 
   case $2 in
   status)
-    cmdhelp='get status of what? node|all|job|'
+    cmdhelp='get status of what? node|all|job|team'
     ofwhat=${3:-""}
     if [[ -z $ofwhat ]]; then
       echo -e $cmdhelp
       exit 1
     fi
     case $3 in
+    team)
+      echo -e "retrieving members of gossip ring"
+      nmd server members -detailed
+      ;;
     node)
       nodeid=${4:-''}
       if [[ -z $nodeid ]]; then
@@ -106,6 +109,7 @@ get)
 
     echo -e "creating job plan for $name"
     nmd job plan "$name.nomad"
+    echo -e 'issues with get plan? make sure to `run job jobName` first'
     ;;
   *) echo -e $gethelp ;;
   esac
@@ -113,15 +117,22 @@ get)
 run)
   name=${2:-""}
   index=${3:-""}
-  if [[ -z $name || -z $index ]]; then
-    echo -e 'syntax: `run jobName jobIndex`'
-    echo -e 'get the job index: `get plan jobName`'
+  if [[ -z $name ]]; then
+    echo -e 'syntax: `run jobName [jobIndex]`'
     exit 1
   fi
   if test ! -f "$name.nomad"; then
     echo -e "ensure jobspec $name.nomad exists in current dir"
     echo -e 'create a new job with `create job jobName`'
     exit 1
+  fi
+  if [[ -z $index ]]; then
+    echo -e 'you should always use the jobIndex'
+    echo -e 'get the job index: `get plan jobName`'
+    echo -e 'syntax: `run jobName [jobIndex]`'
+    echo -e "running job $name anyway :("
+    nmd job run $name.nomad
+    exit $?
   fi
   echo -e "running job $name at index $index"
   nmd job run -check-index $index $name.nomad
