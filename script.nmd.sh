@@ -16,8 +16,8 @@ case $nmdcmd in
 start)
   case $2 in
   dev)
-    echo -e "starting agents in dev mode"
-    nmd agent -dev -bind 0.0.0.0 -log-level INFO
+    echo -e "starting agents in dev mode with sudo"
+    sudo nomad agent -dev -bind 0.0.0.0 -log-level INFO
     ;;
   *) echo -e "dev| ..." ;;
   esac
