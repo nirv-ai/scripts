@@ -64,36 +64,38 @@ get)
     nmd alloc logs $2 $3
     ;;
   plan)
-    jobname=${3:-""}
-    if [[ -z $jobname ]]; then
+    name=${3:-""}
+    if [[ -z $name ]]; then
       echo 'syntax: `create plan jobName`'
       exit 1
     fi
-    if test ! -f "$3.nomad"; then
-      echo -e "ensure jobspec $3.nomad exists in current dir"
+    if test ! -f "$name.nomad"; then
+      echo -e "ensure jobspec $name.nomad exists in current dir"
       echo -e 'create a new job plan with `create job jobName`'
       exit 1
     fi
 
-    echo -e "creating job plan for $3"
-    nmd job plan "$3.nomad"
+    echo -e "creating job plan for $name"
+    nmd job plan "$name.nomad"
     ;;
   *) echo -e $gethelp ;;
   esac
   ;;
 run)
-  jobname=${2:-""}
-  if [[ -z $jobname ]]; then
-    echo 'syntax: `run jobName`'
+  name=${2:-""}
+  index=${3:-""}
+  if [[ -z $name || -z $index ]]; then
+    echo -e 'syntax: `run jobName jobIndex`'
+    echo -e 'get the job index: `get plan jobName`'
     exit 1
   fi
-  if test ! -f "$2.nomad"; then
-    echo -e "ensure jobspec $2.nomad exists in current dir"
+  if test ! -f "$name.nomad"; then
+    echo -e "ensure jobspec $name.nomad exists in current dir"
     echo -e 'create a new job with `create job jobName`'
     exit 1
   fi
-  echo -e "running job $2"
-  nmd job run ${2}.nomad
+  echo -e "running job $name at index $index"
+  nmd job run -check-index $index $name.nomad
   ;;
 *) echo -e $nmdhelp ;;
 esac
