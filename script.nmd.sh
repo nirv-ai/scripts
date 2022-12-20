@@ -80,8 +80,13 @@ get)
     esac
     ;;
   loc)
-    echo -e "checking allocation for id $2"
-    nmd alloc status $2
+    id=${3:-""}
+    if [[ -z $id ]]; then
+      echo -e "syntax: get loc locId"
+      exit 1
+    fi
+    echo -e "checking allocation for id $3"
+    nmd alloc status $3
     ;;
   loc-logs)
     echo -e "fetching task $3 logs for allocation id $2 "
@@ -90,7 +95,7 @@ get)
   plan)
     name=${3:-""}
     if [[ -z $name ]]; then
-      echo 'syntax: `create plan jobName`'
+      echo 'syntax: `get plan jobName`'
       exit 1
     fi
     if test ! -f "$name.nomad"; then
