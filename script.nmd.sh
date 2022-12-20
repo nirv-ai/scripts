@@ -71,6 +71,15 @@ get)
       nmd node status -verbose $nodeid
       ;;
     all) nmd status ;;
+    loc)
+      id=${4:-""}
+      if [[ -z $id ]]; then
+        echo 'syntax: `get status loc allocId`'
+        exit 1
+      fi
+      echo -e "getting status of allocation: $id"
+      nmd status $id
+      ;;
     job)
       name=${4:-""}
       if [[ -z $name ]]; then
@@ -80,7 +89,7 @@ get)
       echo -e "getting status of $name"
       nmd job status $name
       ;;
-    *) echo -e "node|all|job" ;;
+    *) echo -e "team|node|all|job|loc" ;;
     esac
     ;;
   loc)
