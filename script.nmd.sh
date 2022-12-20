@@ -77,6 +77,7 @@ get)
         echo 'syntax: `get status job jobName`'
         exit 1
       fi
+      echo -e "getting status of $name"
       nmd job status $name
       ;;
     *) echo -e "node|all|job" ;;
