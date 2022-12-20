@@ -3,7 +3,7 @@
 set -eu
 
 nmd() {
-  nomad $@
+  nomad "$@"
 }
 
 nmdhelp='get|create|team|start'
@@ -55,7 +55,16 @@ get)
       exit 1
     fi
     case $3 in
-    node) nmd node status ;;
+    node)
+      nodeid=${4:-''}
+      if [[ -z $nodeid ]]; then
+        echo -e 'getting verbose server status'
+        nmd node status -verbose
+        exit 0
+      fi
+      echo -e "getting verbose status for node $nodeid"
+      nmd node status -verbose $nodeid
+      ;;
     all) nmd status ;;
     job)
       name=${4:-""}
