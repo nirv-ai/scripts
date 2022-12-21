@@ -30,6 +30,8 @@ case $1 in
 logs)
   id=${2:-""}
   if [[ -z $id ]]; then
+    # TODO: update this to just grep for a matching file
+    ## based on the short id
     echo -e "\n\n"
     echo -e 'grepping for log file\n'
     echo -e 'truncated ids'
@@ -41,6 +43,7 @@ logs)
     echo -e "\n"
     echo -e '------------------------------------------------'
     echo -e 'pass in a full container ID to see the log file'
+    echo -e 'e.g. logs super_long_id_of_container'
     echo -e '------------------------------------------------'
     echo -e "\n\n"
     exit 0
