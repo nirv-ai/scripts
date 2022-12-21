@@ -21,11 +21,11 @@ elif [ "$1" == "rebuild" ]; then
   dk_ps
 else
   echo "restarting $1"
-  docker container stop "$SERVICE_PREFIX-$1" || true
+  docker container stop "${SERVICE_PREFIX}_${1}" || true
 
   if [ "$2" == "1" ]; then
     echo 'also removing container and rebuilding image'
-    docker container rm "$SERVICE_PREFIX-$1" || true
+    docker container rm "${SERVICE_PREFIX}_${1}" || true
     docker compose build --no-cache --progress=plain $1
   fi
   docker compose up -d $1 --remove-orphans

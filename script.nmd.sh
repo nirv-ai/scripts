@@ -1,9 +1,18 @@
 #!/usr/bin/env bash
+###########
+# this script requires levant and nomad
+# @see https://github.com/hashicorp/levant
+# @see https://github.com/hashicorp/nomad
+##########
 
 # the UI is available at http://localhost:4646
 # nomad doesnt work well with docker desktop, remove it
 
 set -eu
+
+lev() {
+  levant "$@"
+}
 
 nmd() {
   for arg in $@; do
@@ -148,7 +157,7 @@ get)
     echo -e "creating job plan for $name"
     echo -e "\tto use this script to submit the job"
     echo -e '\texecute: `run jobName indexNumber`'
-    nmd job plan "$name.nomad"
+    nmd job plan -var-file=$name.inputs.hcl "$name.nomad"
     ;;
   *) echo -e $gethelp ;;
   esac
