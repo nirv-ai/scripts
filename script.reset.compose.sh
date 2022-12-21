@@ -49,7 +49,7 @@ logs)
     exit 0
   fi
   echo -e "displaying log file for container id $2"
-  sudo cat /var/lib/docker/containers/$2/$2-json.log
+  sudo cat /var/lib/docker/containers/$2/$2-json.log | jq
   exit 0
   ;;
 volumes)
