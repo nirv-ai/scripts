@@ -24,7 +24,31 @@ up() {
 
 echo -e "running reset"
 
+docker compose config
+
 case $1 in
+logs)
+  id=${2:-""}
+  if [[ -z $id ]]; then
+    echo -e "\n\n"
+    echo -e 'grepping for log file\n'
+    echo -e 'truncated ids'
+    docker ps -a
+    echo -e '\n\nfull ids'
+    docker ps -a --no-trunc -q
+    echo -e '\n\navailable log files'
+    sudo ls -l /var/lib/docker/containers
+    echo -e "\n"
+    echo -e '------------------------------------------------'
+    echo -e 'pass in a full container ID to see the log file'
+    echo -e '------------------------------------------------'
+    echo -e "\n\n"
+    exit 0
+  fi
+  echo -e "displaying log file for container id $2"
+  cat sudo /var/lib/docker/containers/$2/$2-json.log
+  exit 0
+  ;;
 volumes)
   create_volumes
   docker volume ls

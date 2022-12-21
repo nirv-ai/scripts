@@ -9,6 +9,8 @@ set -e
 
 SERVICE_PREFIX=${SERVICE_PREFIX:-nirvai}
 
+docker compose config
+
 if [ "$#" -eq 0 ]; then
   echo "restarting all containers"
   docker compose restart
