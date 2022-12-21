@@ -28,28 +28,16 @@ docker compose config
 
 case $1 in
 logs)
-  id=${2:-""}
-  if [[ -z $id ]]; then
-    # TODO: update this to just grep for a matching file
-    ## based on the short id
-    echo -e "\n\n"
-    echo -e 'grepping for log file\n'
-    echo -e 'truncated ids'
-    docker ps -a
-    echo -e '\n\nfull ids'
-    docker ps -a --no-trunc -q
-    echo -e '\n\navailable log files'
-    sudo ls -l /var/lib/docker/containers
-    echo -e "\n"
-    echo -e '------------------------------------------------'
-    echo -e 'pass in a full container ID to see the log file'
-    echo -e 'e.g. logs super_long_id_of_container'
-    echo -e '------------------------------------------------'
-    echo -e "\n\n"
-    exit 0
+  name=${2:-""}
+  if [[ -z $name ]]; then
+    echo -e "syntax: logs appname"
+    exit 1
   fi
-  echo -e "displaying log file for container id $2"
-  sudo cat /var/lib/docker/containers/$2/$2-json.log | jq
+  cname="$SERVICE_PREFIX-$name"
+  ## docker inspect --format="{{.Id}}" some_container_name
+  id=$(docker inspect --format="{{.Id}}" $cname)
+  echo -e "displaying log file for container $cname with id $id"
+  sudo cat /var/lib/docker/containers/$id/$id-json.log | jq
   exit 0
   ;;
 volumes)
@@ -70,7 +58,7 @@ core*)
   fi
   docker container prune -f
   echo "restarting server $1"
-  docker compose build $1
+  docker compose build --no-cache $1
   docker compose up -d $1 --remove-orphans
   docker compose convert $1
   ;;
