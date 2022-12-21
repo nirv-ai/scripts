@@ -6,7 +6,17 @@
 set -eu
 
 nmd() {
-  nomad "$@"
+  nomad fmt
+
+  for arg in $@; do
+    if [[ $arg = -config* ]]; then
+      path=${arg#*=}
+      echo -e "validating config: $path"
+      nomad config validate "$path"
+    fi
+  done
+
+  sudo nomad "$@"
 }
 
 nmdhelp='get|create|start|run|stop'
@@ -23,10 +33,10 @@ start)
   fi
   if [[ $config =~ "noconf" ]]; then
     echo -e "starting server agent(s) in dev mode with sudo"
-    sudo nomad agent -dev -bind 0.0.0.0 -log-level INFO
+    nmd agent -dev -bind 0.0.0.0 -log-level INFO
   fi
   echo -e "starting server agent(s) with supplied config(s): ${@:2}"
-  sudo nomad agent "${@:2}"
+  nmd agent "${@:2}"
   ;;
 create)
   what=${2:-""}
