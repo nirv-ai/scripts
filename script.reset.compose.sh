@@ -9,6 +9,7 @@ set -e
 
 SERVICE_PREFIX=${SERVICE_PREFIX:-nirvai}
 POSTGRES_VOL_NAME=${SERVICE_PREFIX}_core_postgres
+ENV=${NODE_ENV:-development}
 
 create_volumes() {
   docker volume create $POSTGRES_VOL_NAME
@@ -64,7 +65,6 @@ core*)
   echo "restarting server $1"
   docker compose build --no-cache $1
   docker compose up -d $1 --remove-orphans
-  docker compose convert $1
   ;;
 *)
   echo -e 'resetting infrastructure'
@@ -80,3 +80,7 @@ core*)
 esac
 
 dk_ps
+
+echo -e "forcing .env.${ENV}.compose.[yaml, json] in current dir"
+docker compose convert | yq -r -o=json >.env.${ENV}.compose.json
+docker compose convert >.env.${ENV}.compose.yaml
