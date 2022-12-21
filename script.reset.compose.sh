@@ -15,7 +15,7 @@ create_volumes() {
 }
 
 build() {
-  docker compose build --progress=plain
+  docker compose build --no-cache --progress=plain
 }
 
 up() {
@@ -65,7 +65,10 @@ core*)
 *)
   echo 'resetting infrastructure'
   docker compose down
-  dk_rm_all || true
+  docker system prune -a
+  docker stop $(docker ps -a -q) || true
+  docker rm $(docker ps -a -q) || true
+  docker rmi $(docker images -a -q) || true
   create_volumes
   build
   up
