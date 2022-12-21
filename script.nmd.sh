@@ -9,29 +9,24 @@ nmd() {
   nomad "$@"
 }
 
-nmdhelp='get|create|team|start'
+nmdhelp='get|create|start|run|stop'
 nmdcmd=${1:-help}
 
 case $nmdcmd in
 start)
-  case $2 in
-  dev)
-    config=${3:-""}
-    if [[ -z $config ]]; then
-      echo -e 'you must explicity disable or provide server config(s)'
-      echo -e '\t syntax: `start dev noconf`'
-      echo -e '\t syntax: `start dev -config=X -config=Y ...`'
-      exit 1
-    fi
-    if [[ $config =~ "noconf" ]]; then
-      echo -e "starting agents in dev mode with sudo"
-      sudo nomad agent -dev -bind 0.0.0.0 -log-level INFO
-    fi
-    echo -e "starting agents in dev mode with supplied config(s): ${@:3}"
-    sudo nomad agent "${@:3}"
-    ;;
-  *) echo -e "dev| ..." ;;
-  esac
+  config=${2:-""}
+  if [[ -z $config ]]; then
+    echo -e 'you must explicity disable or provide server config(s)'
+    echo -e '\t syntax (dev mode): `start noconf`'
+    echo -e '\t syntax: `start -config=X -config=Y ...`'
+    exit 1
+  fi
+  if [[ $config =~ "noconf" ]]; then
+    echo -e "starting server agent(s) in dev mode with sudo"
+    sudo nomad agent -dev -bind 0.0.0.0 -log-level INFO
+  fi
+  echo -e "starting server agent(s) with supplied config(s): ${@:2}"
+  sudo nomad agent "${@:2}"
   ;;
 create)
   what=${2:-""}
