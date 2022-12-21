@@ -14,8 +14,9 @@ docker compose config
 if [ "$#" -eq 0 ]; then
   echo "restarting all containers"
   docker compose restart
-elif [ "$1" == "restart" ]; then
-  echo "restarting all running containers"
+elif [ "$1" == "rebuild" ]; then
+  echo "rebuilding and restarting containers"
+  docker compose build --no-cache
   docker compose restart
   dk_ps
 else
