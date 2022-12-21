@@ -16,14 +16,31 @@ case $nmdcmd in
 start)
   case $2 in
   dev)
-    echo -e "starting agents in dev mode with sudo"
-    sudo nomad agent -dev -bind 0.0.0.0 -log-level INFO
+    config=${3:-""}
+    if [[ -z $config ]]; then
+      echo -e 'you must explicity disable or provide server config(s)'
+      echo -e '\t syntax: `start dev noconf`'
+      echo -e '\t syntax: `start dev -config=X -config=Y ...`'
+      exit 1
+    fi
+    if [[ $config =~ "noconf" ]]; then
+      echo -e "starting agents in dev mode with sudo"
+      sudo nomad agent -dev -bind 0.0.0.0 -log-level INFO
+    fi
+    echo -e "starting agents in dev mode with supplied config(s): ${@:3}"
+    sudo nomad agent "${@:3}"
     ;;
   *) echo -e "dev| ..." ;;
   esac
   ;;
 create)
-  case $2 in
+  what=${2:-""}
+  case $what in
+  gossipkey)
+    echo -e 'creating gossip encryption key'
+    echo -e 'remember to update your job.nomad server block'
+    nmd operator gossip keyring generate
+    ;;
   job)
     name=${3:-""}
     if [[ -z $name ]]; then
@@ -36,7 +53,7 @@ create)
     echo -e "updating job name in $name.nomad"
     sed -i "/job \"example\"/c\job \"$name\" {" "./$name.nomad"
     ;;
-  *) echo -e "job ..." ;;
+  *) echo -e "syntax: create job|gossipkey." ;;
   esac
   ;;
 get)
