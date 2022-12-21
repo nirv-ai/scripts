@@ -6,12 +6,11 @@
 set -eu
 
 nmd() {
-  nomad fmt
-
   for arg in $@; do
     if [[ $arg = -config* ]]; then
       path=${arg#*=}
-      echo -e "validating config: $path"
+      echo -e "formatting and validating config: $path"
+      nomad fmt -check "$path"
       nomad config validate "$path"
     fi
   done
