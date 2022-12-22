@@ -30,11 +30,19 @@ REG_FQDN="${REG_HOST_NAME}:${REG_HOST_PORT}"
 REG_VOL_NAME=${REG_VOL_NAME:-${REG_SUBD}_registry}
 REG_NAME=${REG_NAME:-$REG_VOL_NAME}
 
+############################ utility fns
+
+get_img_fqdn() {
+  echo "$REG_FQDN/$1"
+}
+
 volumes() {
   echo
   echo "creating volume $REG_VOL_NAME"
   docker volume create $REG_VOL_NAME || true
 }
+
+########################### workflow fns
 
 run_reg() {
   volumes
@@ -61,6 +69,14 @@ run_reg() {
     -v $certs
 }
 
+push_img() {
+  docker push $(get_img_fqdn $1)
+}
+
+tag_image() {
+  docker tag $1 $(get_img_fqdn $1)
+}
+
 reset() {
   docker container stop $REG_FQDN
   docker container rm -v $REG_FQDN
@@ -70,19 +86,18 @@ cmds='start|pull'
 
 case $1 in
 run) run_reg ;;
-pull)
-  image=${2:?'syntax "pull imageName"'}
-  docker pull $REG_FQDN/$image
+push)
+  image=${2:?'syntax "push imageName"'}
+  pull_img $image
   ;;
 tag)
-  syntax='syntax "tag thisImage tagName"'}
+  syntax='syntax "tag thisImage:tagName"'}
   thisImage=${2:?$syntax}
-  withTag=${3:?$syntax}
-  newImage="$REG_FQDN/$withTag"
+
   echo
-  echo "tagging and pushing: $newImage"
-  docker tag $thisImage $newImage
-  docker push $newImage
+  echo "tagging and pushing: $thisImage"
+  tag_image $thisImage
+  push_img $thisImage
   ;;
 *)
   echo
