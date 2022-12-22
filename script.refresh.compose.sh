@@ -15,15 +15,19 @@ dk_ps() {
 SERVICE_PREFIX=${SERVICE_PREFIX:-nirvai}
 ENV=${NODE_ENV:-development}
 
-docker compose config
+echo 'inside'
+echo
+echo
 
 if [ "$#" -eq 0 ]; then
   echo "restarting all containers"
-  docker compose restart
+  docker compose down
+  docker compose up --force-recreate --build -d
 elif [ "$1" == "rebuild" ]; then
   echo "rebuilding and restarting containers"
+  docker compose down
   docker compose build --no-cache
-  docker compose restart
+  docker compose up --force-recreate -d
 else
   echo "restarting $1"
   docker container stop "${SERVICE_PREFIX}_${1}" || true
@@ -41,3 +45,4 @@ dk_ps
 echo -e "forcing .env.${ENV}.compose.[yaml, json] in current dir"
 docker compose convert | yq -r -o=json >.env.${ENV}.compose.json
 docker compose convert >.env.${ENV}.compose.yaml
+# docker compose config

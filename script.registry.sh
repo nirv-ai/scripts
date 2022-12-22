@@ -94,8 +94,9 @@ tag_image() {
   docker tag $thisImage $(get_img_fqdn $thisImage)
   push_img $thisImage
 
-  echo "removing original image sourced from hub"
-  docker image remove $thisImage || true
+  echo "removing (ignore if fail) original image sourced from hub"
+  docker image remove -f $thisImage || true
+  # docker rmi -f $(docker images --filter="reference=*/*:latest*" -q)
 }
 tag_running_containers() {
   echo 'tagging & pushing all running containers images'

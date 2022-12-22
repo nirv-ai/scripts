@@ -51,11 +51,15 @@ export REG_CERTS_PATH=apps/nirvai-core-letsencrypt/dev-nirv-ai
 export REG_DOMAIN=nirv.ai
 export REG_SUBD=dev
 export REG_HOST_PORT=5000
-
 ## your registry will be available at dev.nirv.ai:5000
 ## will auto tag images to that registry
 ## will auto remove images sourced from hub to push to that registry
-######################
+
+###################### basic workflow
+# start the registry
+./script.registry.sh run
+# push running containers to registry
+./script.registry.sh tag_running
 
 
 ##################### usage
@@ -110,6 +114,7 @@ docker compose down
 
 
 ########### cd ./apps/nirvai-core-nomad/dev
+# you only need to do this the first time
 # symlink the json & yaml files
 ln -s ../../../.env.development.compose.* .
 # symlink the nmd script (expected to be a sibling of nirvai/core)
@@ -128,7 +133,10 @@ nomad system gc
 ./script.nmd.sh get plan dev_core
 
 # deploy dev_core
+# on error run
 ./script.nmd.sh run dev_core indexNumber
+./script.nmd.sh get status loc allocationId # in event of deployment failure
+./script.nmd.sh dockerlogs # following docker logs of all running containers
 
 ###################### USAGE
 ## prefix all cmds with ./script.nmd.sh poop poop poop
@@ -137,6 +145,7 @@ nomad system gc
 # check on the server
 get status team
 get status all
+dockerlogs # following logs of all running containers
 
 # creating stuff
 create gossipkey

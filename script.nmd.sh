@@ -20,7 +20,7 @@ nmd() {
 }
 
 ENV=${ENV:-development}
-nmdhelp='get|create|start|run|stop|rm'
+nmdhelp='get|create|start|run|stop|rm|dockerlogs'
 nmdcmd=${1:-help}
 
 case $nmdcmd in
@@ -198,6 +198,15 @@ stop)
   fi
   echo -e "stopping job $name"
   nmd job stop $name
+  ;;
+dockerlogs)
+  # @see https://stackoverflow.com/questions/36756751/view-logs-for-all-docker-containers-simultaneously
+  echo -e 'following logs for all running containers'
+  echo -e 'be sure to delete /tmp directory every so often'
+  for c in $(docker ps -a --format="{{.Names}}"); do
+    docker logs -f $c >/tmp/$c.log 2>/tmp/$c.err &
+  done
+  tail -f /tmp/*.{log,err}
   ;;
 *) echo -e $nmdhelp ;;
 esac

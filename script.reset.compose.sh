@@ -74,9 +74,9 @@ core*)
 *)
   echo -e 'resetting infrastructure'
   docker compose down
-  docker system prune -a
   docker stop $(docker ps -a -q) || true
   docker rm $(docker ps -a -q) || true
+  docker system prune -a
   # docker rmi $(docker images -a -q) || true
   create_volumes
   build
