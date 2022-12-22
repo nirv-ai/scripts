@@ -20,7 +20,7 @@ docker compose convert | yq -r -o=json >.env.${ENV}.compose.json
 # now symlink the .json file to wherever you run nomad cmds
 # symlink this file to the same place
 ## prefix all cmds with ./script.nmd.sh poop poop poop
-## poop being onef the below
+## poop being one of the below
 create job myJobName
 get plan myJobName
 run job myJobName
