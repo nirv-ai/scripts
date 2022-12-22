@@ -37,7 +37,7 @@ run job myJobName indexNumber
 
 # checking on running/failing stuff
 get status node # see nodes and there ids
-get status node nodeId? # provding nodeId is super helpful; also provides allocationId
+get status node nodeId # provding nodeId is super helpful; also provides allocationId
 get status loc allocationId # super helpful for checking on failed jobs
 get status dep deploymentId # super helpful
 
