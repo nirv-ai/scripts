@@ -19,10 +19,12 @@
 # @see https://discuss.hashicorp.com/t/failed-to-find-plugin-bridge-in-path/3095
 ## ^ need to enable cni plugin
 # @see https://developer.hashicorp.com/nomad/docs/drivers/docker#enabled-1
-## need to enable bind mounts
+## ^ need to enable bind mounts
 # @see https://developer.hashicorp.com/nomad/docs/drivers/docker#allow_caps
-## for vault you need to enable cap_add ipc_lock
-## for debugging set it to "all"
+## ^ for vault you need to enable cap_add ipc_lock
+## ^ for debugging set it to "all"
+# @see registry.sh
+## ^ Failed to find docker auth
 #########
 
 #########
@@ -51,18 +53,25 @@ create job myJobName
 get plan myJobName # provides indexNumber
 
 # running stuff
-run job myJobName indexNumber
+run myJobName indexNumber
+
+# restarting stuff
+restart loc allocationId taskName # todo: https://developer.hashicorp.com/nomad/docs/commands/alloc/restart
+
+# execing stuff
+exec loc  allocationId cmd .... @ todo https://developer.hashicorp.com/nomad/docs/commands/alloc/exec
 
 # checking on running/failing stuff
 get status node # see nodes and there ids
 get status node nodeId # provding nodeId is super helpful; also provides allocationId
-get status loc allocationId # super helpful for checking on failed jobs
+get status loc allocationId # super helpful for checking on failed jobs, provides deployment id
 get status dep deploymentId # super helpful
 get logs jobName deploymentId
 
 # stopping stuff
 stop job myJobName
 rm myJobName # this purges the job
+system gc # todo: nomad system gc # this is your fkn friend
 
 ```
 

@@ -55,7 +55,7 @@ create)
     fi
 
     echo -e "creating new job $3.nomad in the current dir"
-    nmd job init -short "$3.nomad"
+    nmd job init -short "$ENV.$name.nomad"
     echo -e "updating job name in $ENV.$name.nomad"
     sed -i "/job \"example\"/c\job \"$name\" {" "./$ENV.$name.nomad"
     ;;
