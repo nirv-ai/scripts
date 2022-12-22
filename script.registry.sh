@@ -1,20 +1,5 @@
 #!/usr/bin/env sh
 
-####################### READ FIRST
-# @see [repo] https://github.com/distribution/distribution
-# @see [docs] https://github.com/docker/docs/tree/main/registry
-# @see [docs] https://github.com/docker/docs/blob/main/registry/configuration.md
-## @see https://www.marcusturewicz.com/blog/build-and-publish-docker-images-with-github-packages/
-## @see https://docs.github.com/en/actions/publishing-packages/publishing-docker-images
-#######################
-
-####################### FYI
-# setup for a local registry for development
-# but definitely recommend canceling netflix
-# so you can afford $5 (...$7) private registry with docker hub
-## from hub: You are expected to be familiar with systems availability and scalability, logging and log processing, systems monitoring, and security 101. Strong understanding of http and overall network communications, plus familiarity with golang are certainly useful as well for advanced operations or hacking.
-#######################
-
 set -eu
 
 # required
@@ -104,18 +89,16 @@ tag_image() {
   push_img $thisImage
 }
 tag_running_containers() {
-  echo 'tagging & pushing all running containers'
-  echo 'if you dont to persist changes, stop and restart the container(s) first'
+  echo 'tagging & pushing all running containers images'
   # echo $(docker inspect nirvai_core_ui | jq '.[] | {sha: .Image, name: .Name}')
 
   # haha got lucky on this one, docker format has 0 documentation
   docker ps --format '{{json .}}' | jq '.Image' | while IFS= read -r cunt; do
     echo
     echo "processing cunt: $cunt"
-    # xargs removes unquotes the cunts name
-    cuntWithoutQuotes=$(echo $cunt | xargs)
 
-    tag_image $cuntWithoutQuotes
+    # xargs  unquotes the cunts name
+    tag_image $(echo $cunt | xargs)
   done
 }
 reset() {

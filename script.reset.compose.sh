@@ -7,6 +7,11 @@
 
 set -e
 
+# @see bookOfNoah
+dk_ps() {
+  docker ps --no-trunc -a --format 'table {{.Names}}\n\t{{.Image}}\n\t{{.Status}}\n\t{{.Command}}\n\n' | tac
+}
+
 SERVICE_PREFIX=${SERVICE_PREFIX:-nirvai}
 POSTGRES_VOL_NAME=${SERVICE_PREFIX}_core_postgres
 ENV=${NODE_ENV:-development}

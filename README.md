@@ -1,16 +1,53 @@
 # NIRVAI SCRIPTS
 
-- useful scripts
+- useful scripts for working within a monorepo, e.g. [turborepo](https://turbo.build/repo/docs)
 - additional readme coming soon
 
 ## TLDR
 
-- many of the scripts rely on shell fns [within this public repo](https://github.com/noahehall/theBookOfNoah/tree/master/linux/bash_cli_fns)
-- you can setup your shell to be l33t like me by [sourcing this file](https://github.com/noahehall/theBookOfNoah/blob/master/linux/_sourceme_.sh) in the parent directory
+- requires the following to be available
+  - [JQ](https://stedolan.github.io/jq/)
+  - [YQ](https://github.com/mikefarah/yq)
+  - each script requires the service it works with, e.g. registry.sh requires docker, vault requires vault, etc
+- clone the repo and symlink the scripts to the root of your repo
+  - some scripts are useful in the root of a specific app, e.g. nmd.sh should be wherever you execute nomad
+
+## script.registry.sh
+
+- actively used for working with a private docker registry on localhost
+
+```sh
+####################### READ FIRST
+# @see [repo] https://github.com/distribution/distribution
+# @see [docs] https://github.com/docker/docs/tree/main/registry
+# @see https://www.marcusturewicz.com/blog/build-and-publish-docker-images-with-github-packages/
+## @see https://docs.github.com/en/actions/publishing-packages/publishing-docker-images
+#######################
+
+####################### FYI
+# setup for a local registry for development
+# but definitely recommend canceling disney plus (but keep netflix, just sayin)
+# so you can afford $5 (...$7) private registry with docker hub
+## from hub: You are expected to be familiar with systems
+## availability and scalability, logging and log processing,
+## systems monitoring, and security 101. Strong understanding
+## of http and overall network communications,
+## plus familiarity with golang are certainly useful
+## as well for advanced operations or hacking.
+#######################
+
+./script.registry.sh poop
+
+> run: runs a registry
+> reset: purges and restarts a registry
+> tag: tags an image and pushes it to registry
+> tag_running: tags the image of all running containers and pushes all to registry
+
+```
 
 ## script.nmd.sh
 
-- actively used for running nomad jobs
+- actively used for working with nomad
 
 ```sh
 ################# help links

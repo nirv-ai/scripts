@@ -7,6 +7,11 @@ set -e
 # for something more destructive, use reset script
 ###########################
 
+# @see bookOfNoah
+dk_ps() {
+  docker ps --no-trunc -a --format 'table {{.Names}}\n\t{{.Image}}\n\t{{.Status}}\n\t{{.Command}}\n\n' | tac
+}
+
 SERVICE_PREFIX=${SERVICE_PREFIX:-nirvai}
 ENV=${NODE_ENV:-development}
 
