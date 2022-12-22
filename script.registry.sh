@@ -116,8 +116,8 @@ reset() {
 }
 
 cmds='run|reset|tag|tag_running'
-
-case $1 in
+cmd=${1:-''}
+case $cmd in
 run) run_reg ;;
 reset) reset_reg ;;
 tag) tag_image $2 ;;
