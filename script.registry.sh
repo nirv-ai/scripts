@@ -67,6 +67,11 @@ run_reg() {
     --restart=always \
     -v $storage \
     -v $certs
+
+  if [ "$?" -ne 0 ]; then
+    echo "$REG_NAME already created: restarting..."
+    docker restart $REG_NAME
+  fi
 }
 
 push_img() {
@@ -98,6 +103,17 @@ tag)
   echo "tagging and pushing: $thisImage"
   tag_image $thisImage
   push_img $thisImage
+  ;;
+reset)
+  echo 'reviewing logs before resetting'
+  id=$(docker inspect --format="{{.Id}}" $REG_NAME)
+  sudo cat /var/lib/docker/containers/$id/$id-json.log | jq || true
+
+  echo
+  echo "resetting $REG_NAME"
+  docker stop $REG_NAME || true
+  docker container rm $REG_NAME || true
+  run_reg
   ;;
 *)
   echo
