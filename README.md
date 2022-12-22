@@ -13,6 +13,7 @@
 - actively used for running nomad jobs
 
 ```sh
+################# help links
 #########
 # @see https://github.com/hashicorp/nomad
 # @see https://discuss.hashicorp.com/t/failed-to-find-plugin-bridge-in-path/3095
@@ -25,14 +26,6 @@
 # FYI
 # the UI is available at http://localhost:4646
 # nomad doesnt work well with docker desktop, remove it
-#########
-
-#########
-# this expects your files to be named
-# ENV.jobName.nomad (auto created by this script)
-# .env.ENV.compose.json (see below)
-# check nirvai/scripts for automatically creating the .env...compose file
-# you can then symlink `ln -s jsonfilename ./`
 #########
 
 ################# basic workflow
@@ -50,6 +43,7 @@ get status team
 get status all
 
 # creating stuff
+create gossipkey
 create job myJobName
 get plan myJobName # provides indexNumber
 
@@ -61,6 +55,7 @@ get status node # see nodes and there ids
 get status node nodeId # provding nodeId is super helpful; also provides allocationId
 get status loc allocationId # super helpful for checking on failed jobs
 get status dep deploymentId # super helpful
+get logs jobName deploymentId
 
 # stopping stuff
 stop job myJobName
