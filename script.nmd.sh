@@ -1,29 +1,38 @@
 #!/usr/bin/env bash
 ###########
-# this script requires levant and nomad
-# @see https://github.com/hashicorp/levant
 # @see https://github.com/hashicorp/nomad
 ##########
 
+#########
 # the UI is available at http://localhost:4646
 # nomad doesnt work well with docker desktop, remove it
+#########
+
+########
+# this expects your files to be named
+# ENV.jobName.nomad
+# .env.ENV.compose.json
+# check nirvai/scripts for automatically creating the .env...compose file
+#######
 
 set -eu
 
-lev() {
-  levant "$@"
-}
+ENV=${ENV:-development}
 
 nmd() {
   for arg in $@; do
-    if [[ $arg = -config* ]]; then
+    if [[ $arg = -config* || $arg = *.nomad ]]; then
       path=${arg#*=}
-      echo -e "formatting and validating config: $path"
+      echo -e "formatting and validating file: $path"
       nomad fmt -check "$path"
-      nomad config validate "$path"
+      if [[ $arg = -config* ]]; then
+        nomad config validate "$path"
+      fi
     fi
   done
 
+  echo -e "running: nomad $@"
+  echo ""
   sudo nomad "$@"
 }
 
@@ -63,8 +72,8 @@ create)
 
     echo -e "creating new job $3.nomad in the current dir"
     nmd job init -short "$3.nomad"
-    echo -e "updating job name in $name.nomad"
-    sed -i "/job \"example\"/c\job \"$name\" {" "./$name.nomad"
+    echo -e "updating job name in $ENV.$name.nomad"
+    sed -i "/job \"example\"/c\job \"$name\" {" "./$ENV.$name.nomad"
     ;;
   *) echo -e "syntax: create job|gossipkey." ;;
   esac
@@ -148,8 +157,8 @@ get)
       echo 'syntax: `get plan jobName`'
       exit 1
     fi
-    if test ! -f "$name.nomad"; then
-      echo -e "ensure jobspec $name.nomad exists in current dir"
+    if test ! -f "$ENV.$name.nomad"; then
+      echo -e "ensure jobspec $ENV.$name.nomad exists in current dir"
       echo -e 'create a new job plan with `create job jobName`'
       exit 1
     fi
@@ -157,7 +166,7 @@ get)
     echo -e "creating job plan for $name"
     echo -e "\tto use this script to submit the job"
     echo -e '\texecute: `run jobName indexNumber`'
-    nmd job plan -var-file=$name.inputs.hcl "$name.nomad"
+    nmd job plan -var-file=.env.$ENV.compose.json "$ENV.$name.nomad"
     ;;
   *) echo -e $gethelp ;;
   esac
@@ -169,8 +178,8 @@ run)
     echo -e 'syntax: `run jobName [jobIndex]`'
     exit 1
   fi
-  if test ! -f "$name.nomad"; then
-    echo -e "ensure jobspec $name.nomad exists in current dir"
+  if test ! -f "$ENV.$name.nomad"; then
+    echo -e "ensure jobspec $ENV.$name.nomad exists in current dir"
     echo -e 'create a new job with `create job jobName`'
     exit 1
   fi
@@ -179,14 +188,14 @@ run)
     echo -e 'get the job index: `get plan jobName`'
     echo -e 'syntax: `run jobName [jobIndex]`'
     echo -e "running job $name anyway :("
-    nmd job run $name.nomad
+    nmd job run $ENV.$name.nomad
     exit $?
   fi
   echo -e "running job $name at index $index"
   echo -e '\t job failures? get the allocation id from the job status'
   echo -e '\t execute: get status job jobName'
   echo -e '\t execute: get status loc allocId\n\n'
-  nmd job run -check-index $index $name.nomad
+  nmd job run -check-index $index $ENV.$name.nomad
   ;;
 stop)
   name=${2:-""}
