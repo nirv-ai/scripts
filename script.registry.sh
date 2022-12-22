@@ -9,7 +9,7 @@
 #######################
 
 ####################### FYI
-# setup for a local registry for testing
+# setup for a local registry for development
 # but definitely recommend canceling netflix
 # so you can afford $5 (...$7) private registry with docker hub
 ## from hub: You are expected to be familiar with systems availability and scalability, logging and log processing, systems monitoring, and security 101. Strong understanding of http and overall network communications, plus familiarity with golang are certainly useful as well for advanced operations or hacking.
@@ -43,6 +43,11 @@ volumes() {
   docker volume create $REG_VOL_NAME || true
 }
 
+push_img() {
+  image=$(get_img_fqdn $1)
+  echo "pushing image: $image"
+  docker push $image
+}
 ########################### workflow fns
 
 run_reg() {
@@ -74,37 +79,7 @@ run_reg() {
   fi
 }
 
-push_img() {
-  docker push $(get_img_fqdn $1)
-}
-
-tag_image() {
-  docker tag $1 $(get_img_fqdn $1)
-}
-
-reset() {
-  docker container stop $REG_FQDN
-  docker container rm -v $REG_FQDN
-}
-
-cmds='start|pull'
-
-case $1 in
-run) run_reg ;;
-push)
-  image=${2:?'syntax "push imageName"'}
-  pull_img $image
-  ;;
-tag)
-  syntax='syntax "tag thisImage:tagName"'}
-  thisImage=${2:?$syntax}
-
-  echo
-  echo "tagging and pushing: $thisImage"
-  tag_image $thisImage
-  push_img $thisImage
-  ;;
-reset)
+reset_reg() {
   id=$(docker inspect --format="{{.Id}}" $REG_NAME) 2>/dev/null || true
   if test ! -z $id; then
     echo 'reviewing disk logs before resetting: this requires sudo'
@@ -118,7 +93,28 @@ reset)
   docker stop $REG_NAME || true
   docker container rm $REG_NAME || true
   run_reg
-  ;;
+}
+
+tag_image() {
+  thisImage=${1:?'syntax "tag thisImage:tagName"'}
+  echo
+  echo "tagging and pushing: $thisImage"
+  docker tag $thisImage $(get_img_fqdn $thisImage)
+  push_img $thisImage
+}
+
+reset() {
+  docker container stop $REG_FQDN
+  docker container rm -v $REG_FQDN
+}
+
+cmds='start|pull'
+
+case $1 in
+run) run_reg ;;
+reset) reset_reg ;;
+push) ${99:?'syntax "push imageName"'} && pull_img "$2" ;;
+tag) tag_image $2 ;;
 *)
   echo
   echo "commands: $cmds"
