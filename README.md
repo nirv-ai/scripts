@@ -94,21 +94,39 @@ export REG_HOST_PORT=5000
 # nomad doesnt work well with docker desktop, remove it
 ######################
 
+
+
 ###################### basic workflow
 ########### cd nirvai/core
 # refresh containers and upsert env.compose.json & yaml
 ./script.refresh.compose.sh
 
 # ensure you've completed steps in ./script.registry.sh (see above)
-# start the registry and push all container images to local registry
-# ./script.registry.sh run
-# ./script.registry.sh tag_running
+# start the registry and push all running container images to local registry
+./script.registry.sh run
+./script.registry.sh tag_running
+# stop all running containers
+docker compose down
 
 
 ########### cd ./apps/nirvai-core-nomad/dev
 # symlink the json & yaml files
+ln -s ../../../.env.development.compose.* .
+# symlink the nmd script (expected to be a sibling of nirvai/core)
+ln -s ../../../../scripts/script.nmd.sh .
 
 ###################### now you can operate nomad
+# start server agent
+./script.nmd.sh start -config=development.leader.nomad
+./script.nmd.sh get status team
+
+# create a job plan and get job index number
+./script.nmd.sh get plan dev_core
+
+# deploy dev_core
+./script.nmd.sh run dev_core indexNumber
+
+###################### USAGE
 ## prefix all cmds with ./script.nmd.sh poop poop poop
 ## poop being one of the below
 
