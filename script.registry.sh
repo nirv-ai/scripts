@@ -110,12 +110,8 @@ tag_running_containers() {
     tag_image $(echo $cunt | xargs)
   done
 }
-reset() {
-  docker container stop $REG_FQDN
-  docker container rm -v $REG_FQDN
-}
 
-cmds='run|reset|tag|tag_running'
+cmds='run|reset|rm|tag|tag_running'
 cmd=${1:-''}
 case $cmd in
 run) run_reg ;;

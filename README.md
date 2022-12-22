@@ -95,17 +95,18 @@ export REG_HOST_PORT=5000
 ######################
 
 ###################### basic workflow
-# do your development in docker compose
-# when ready for a new release
-# get docker export
-docker compose build
-docker compose convert | yq -r -o=json >.env.${ENV}.compose.json
-# now symlink the .json file to wherever you run nomad cmds
+########### cd nirvai/core
+# refresh containers and upsert env.compose.json & yaml
+./script.refresh.compose.sh
 
 # ensure you've completed steps in ./script.registry.sh (see above)
-# start the registry and tag all running containers
+# start the registry and push all container images to local registry
 # ./script.registry.sh run
 # ./script.registry.sh tag_running
+
+
+########### cd ./apps/nirvai-core-nomad/dev
+# symlink the json & yaml files
 
 ###################### now you can operate nomad
 ## prefix all cmds with ./script.nmd.sh poop poop poop
