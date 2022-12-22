@@ -36,6 +36,13 @@
 ## as well for advanced operations or hacking.
 #######################
 
+###################### setup your /etc/hosts
+# e.g. to use a registry at dev.nirv.ai:5000
+# add the following to /etc/hosts
+127.0.0.1 dev.nirv.ai
+# checkout /letencrypt dir for configuring a TLS cert pointed at dev.nirv.ai
+###################### available scripts
+
 ./script.registry.sh poop
 
 > run: runs a registry
