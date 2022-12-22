@@ -8,6 +8,8 @@
 - requires the following to be available
   - [JQ](https://stedolan.github.io/jq/)
   - [YQ](https://github.com/mikefarah/yq)
+  - bash, or zsh/fish/etc set to `export bash=zsh`
+    - moving to POSIX shell soon
   - each script requires the service it works with, e.g. registry.sh requires docker, vault requires vault, etc
 - clone the repo and symlink the scripts to the root of your repo
   - some scripts are useful in the root of a specific app, e.g. nmd.sh should be wherever you execute nomad
@@ -17,14 +19,14 @@
 - actively used for working with a private docker registry on localhost
 
 ```sh
-####################### READ FIRST
+###################### READ FIRST
 # @see [repo] https://github.com/distribution/distribution
 # @see [docs] https://github.com/docker/docs/tree/main/registry
 # @see https://www.marcusturewicz.com/blog/build-and-publish-docker-images-with-github-packages/
 ## @see https://docs.github.com/en/actions/publishing-packages/publishing-docker-images
-#######################
+######################
 
-####################### FYI
+###################### FYI
 # setup for a local registry for development
 # but definitely recommend canceling disney plus (but keep netflix, just sayin)
 # so you can afford $5 (...$7) private registry with docker hub
@@ -34,14 +36,20 @@
 ## of http and overall network communications,
 ## plus familiarity with golang are certainly useful
 ## as well for advanced operations or hacking.
-#######################
+######################
 
 ###################### setup your /etc/hosts
 # e.g. to use a registry at dev.nirv.ai:5000
 # add the following to /etc/hosts
 127.0.0.1 dev.nirv.ai
 # checkout /letencrypt dir for configuring a TLS cert pointed at dev.nirv.ai
+######################
+
+
+
 ###################### available scripts
+# assumes you have a etc/hosts setup
+# assumes you use letsencrypt for getting a cert
 
 ./script.registry.sh poop
 
@@ -57,8 +65,7 @@
 - actively used for working with nomad
 
 ```sh
-################# help links
-#########
+###################### help links
 # @see https://github.com/hashicorp/nomad
 # @see https://discuss.hashicorp.com/t/failed-to-find-plugin-bridge-in-path/3095
 ## ^ need to enable cni plugin
@@ -69,15 +76,15 @@
 ## ^ for debugging set it to "all"
 # @see registry.sh
 ## ^ Failed to find docker auth
-#########
+######################
 
-#########
+######################
 # FYI
 # the UI is available at http://localhost:4646
 # nomad doesnt work well with docker desktop, remove it
-#########
+######################
 
-################# basic workflow
+###################### basic workflow
 
 # get docker export
 docker compose build
@@ -131,56 +138,55 @@ system gc # todo: nomad system gc # this is your fkn friend
     - can be set to an empty string if you dont have one yet
 
 ```sh
-# usage
-./script.vault.sh cmd
+####################### usage
+./script.vault.sh poop poop poop
 
-## cmds
-### enable a secret engine e.g. kv-v2
+# enable a secret engine e.g. kv-v2
 enable secret secretEngineType
 
-### enable approle engine e.g. approle
+# enable approle engine e.g. approle
 enable approle approleType
 
-### list all approles
+# list all approles
 list approles
 
-### list enabled secrets engines
+# list enabled secrets engines
 list secret-engines
 
-### list provisioned keys for a postgres role
+# list provisioned keys for a postgres role
 list postgres leases dbRoleName
 
-### create a secret-id for roleName
+# create a secret-id for roleName
 create approle-secret roleName
 
-### upsert approle appRoleName with a list of attached policies
+# upsert approle appRoleName with a list of attached policies
 create approle appRoleName pol1,polX
 
-### create kv2 secret(s) at secretPath
-#### dont prepend `secret/` to secretPath
-#### e.g. create secret kv2 poo/in/ur/eye '{"a": "b", "c": "d"}'
+# create kv2 secret(s) at secretPath
+# dont prepend `secret/` to secretPath
+# e.g. create secret kv2 poo/in/ur/eye '{"a": "b", "c": "d"}'
 create secret kv2 secretPath jsonString
 
-### get dynamic postgres creds for database role dbRoleName
+# get dynamic postgres creds for database role dbRoleName
 get postgres creds dbRoleName
 
-### get the secret (kv-v2) at the given path, e.g. foo
-#### dont prepend `secret/` to path
+# get the secret (kv-v2) at the given path, e.g. foo
+# dont prepend `secret/` to path
 get secret secretPath
 
-### get the status (sys/healthb) of the vault server
+# get the status (sys/healthb) of the vault server
 get status
 
-### get vault credentials for an approle
+# get vault credentials for an approle
 get creds roleId secretId
 
-### get all properties associated with an approle
+# get all properties associated with an approle
 get approle info appRoleName
 
-### get the approle role_id for roleName
+# get the approle role_id for roleName
 get approle id appRoleName
 
-### get the openapi spec for some path
+# get the openapi spec for some path
 help some/path/
 
 ```

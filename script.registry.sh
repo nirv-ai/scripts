@@ -10,7 +10,6 @@ REG_CERTS_PATH=${REG_CERTS_PATH:?REG_CERTS_PATH not set: exiting}
 REG_DOMAIN=${REG_DOMAIN:-nirv.ai}
 REG_SUBD=${REG_SUBD:-dev}
 REG_HOST_PORT=${REG_HOST_PORT:-5000}
-REG_CONT_PORT=${REG_CONT_PORT:-$REG_HOST_PORT}
 REG_HOST_NAME=${REG_HOST_NAME:-"${REG_SUBD}.${REG_DOMAIN}"}
 REG_FQDN="${REG_HOST_NAME}:${REG_HOST_PORT}"
 REG_VOL_NAME=${REG_VOL_NAME:-${REG_SUBD}_registry}
@@ -45,7 +44,9 @@ run_reg() {
     exit 1
   fi
 
-  portmap="$REG_HOST_PORT:$REG_CONT_PORT"
+  portmap="$REG_HOST_PORT:443"
+  CUNT_CERT_PATH=/etc/ssl/certs
+  CUNT_LIVE_CERT_PATH=$CUNT_CERT_PATH/live/$REG_HOST_NAME
 
   echo
   echo "creating registry: $REG_NAME on $portmap"
@@ -55,8 +56,11 @@ run_reg() {
   docker run -d -p $portmap \
     --name $REG_NAME \
     --restart unless-stopped \
+    -e REGISTRY_HTTP_ADDR=0.0.0.0:443 \
+    -e REGISTRY_HTTP_TLS_CERTIFICATE=$CUNT_LIVE_CERT_PATH/fullchain.pem \
+    -e REGISTRY_HTTP_TLS_KEY=$CUNT_LIVE_CERT_PATH/privkey.pem \
     -v "$REG_VOL_NAME:/var/lib/registry" \
-    -v "$real_certs_path:/etc/ssl/certs/$REG_DOMAIN/$REG_SUBD" \
+    -v "$real_certs_path:$CUNT_CERT_PATH" \
     registry:2
 
   if [ "$?" -ne 0 ]; then
