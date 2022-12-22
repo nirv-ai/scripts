@@ -20,6 +20,9 @@
 ## ^ need to enable cni plugin
 # @see https://developer.hashicorp.com/nomad/docs/drivers/docker#enabled-1
 ## need to enable bind mounts
+# @see https://developer.hashicorp.com/nomad/docs/drivers/docker#allow_caps
+## for vault you need to enable cap_add ipc_lock
+## for debugging set it to "all"
 #########
 
 #########
