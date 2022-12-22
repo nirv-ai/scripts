@@ -23,23 +23,27 @@ docker compose convert | yq -r -o=json >.env.${ENV}.compose.json
 # symlink this file to the same place
 ## prefix all cmds with ./script.nmd.sh poop poop poop
 ## poop being one of the below
+
 # check on the server
 get status team
 get status all
 
 # creating stuff
 create job myJobName
-get plan myJobName
+get plan myJobName # provides indexNumber
+
 # running stuff
-run job myJobName
+run job myJobName indexNumber
+
 # checking on running/failing stuff
 get status node # see nodes and there ids
 get status node nodeId? # provding nodeId is super helpful; also provides allocationId
 get status loc allocationId # super helpful for checking on failed jobs
 get status dep deploymentId # super helpful
+
 # stopping stuff
 stop job myJobName
-rm myJobName
+rm myJobName # this purges the job
 
 ```
 
