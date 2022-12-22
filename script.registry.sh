@@ -1,5 +1,7 @@
 #!/usr/bin/env sh
 
+# TODO: https://github.com/docker/docs/blob/main/registry/deploying.md#restricting-access
+
 set -eu
 
 # required

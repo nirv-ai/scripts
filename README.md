@@ -46,11 +46,21 @@
 ######################
 
 
+###################### interface
+export REG_CERTS_PATH=apps/nirvai-core-letsencrypt/dev-nirv-ai
+export REG_DOMAIN=nirv.ai
+export REG_SUBD=dev
+export REG_HOST_PORT=5000
 
-###################### available scripts
-# assumes you have a etc/hosts setup
-# assumes you use letsencrypt for getting a cert
+## your registry will be available at dev.nirv.ai:5000
+## will auto tag images to that registry
+## will auto remove images sourced from hub to push to that registry
+######################
 
+
+##################### usage
+## ensure the ENV vars are set
+## its setup to point for local development at dev.nirv.ai
 ./script.registry.sh poop
 
 > run: runs a registry
@@ -63,9 +73,10 @@
 ## script.nmd.sh
 
 - actively used for working with nomad
+- requires you have a local docker registry setup, see registry.sh
 
 ```sh
-###################### help links
+###################### helpful links
 # @see https://github.com/hashicorp/nomad
 # @see https://discuss.hashicorp.com/t/failed-to-find-plugin-bridge-in-path/3095
 ## ^ need to enable cni plugin
@@ -78,14 +89,12 @@
 ## ^ Failed to find docker auth
 ######################
 
-######################
-# FYI
+###################### FYI
 # the UI is available at http://localhost:4646
 # nomad doesnt work well with docker desktop, remove it
 ######################
 
 ###################### basic workflow
-
 # get docker export
 docker compose build
 docker compose convert | yq -r -o=json >.env.${ENV}.compose.json
