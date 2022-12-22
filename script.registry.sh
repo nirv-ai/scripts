@@ -87,6 +87,9 @@ tag_image() {
   echo "tagging and pushing: $thisImage"
   docker tag $thisImage $(get_img_fqdn $thisImage)
   push_img $thisImage
+
+  echo "removing original image sourced from hub"
+  docker image remove $thisImage || true
 }
 tag_running_containers() {
   echo 'tagging & pushing all running containers images'
