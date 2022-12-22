@@ -38,7 +38,7 @@ nmd() {
 }
 
 ENV=${ENV:-development}
-nmdhelp='get|create|start|run|stop'
+nmdhelp='get|create|start|run|stop|rm'
 nmdcmd=${1:-help}
 
 case $nmdcmd in
@@ -167,7 +167,7 @@ get)
 
     echo -e "creating job plan for $name"
     echo -e "\tto use this script to submit the job"
-    echo -e '\texecute: `run jobName indexNumber`'
+    echo -e "\texecute: run $name indexNumber"
     nmd job plan -var-file=.env.$ENV.compose.json "$ENV.$name.nomad"
     ;;
   *) echo -e $gethelp ;;
@@ -190,14 +190,23 @@ run)
     echo -e 'get the job index: `get plan jobName`'
     echo -e 'syntax: `run jobName [jobIndex]`'
     echo -e "running job $name anyway :("
-    nmd job run $ENV.$name.nomad
+    nmd job run -var-file=.env.$ENV.compose.json $ENV.$name.nomad
     exit $?
   fi
   echo -e "running job $name at index $index"
   echo -e '\t job failures? get the allocation id from the job status'
   echo -e '\t execute: get status job jobName'
   echo -e '\t execute: get status loc allocId\n\n'
-  nmd job run -check-index $index $ENV.$name.nomad
+  nmd job run -check-index $index -var-file=.env.$ENV.compose.json $ENV.$name.nomad
+  ;;
+rm)
+  name=${2:-""}
+  if [[ -z $name ]]; then
+    echo -e 'syntax: `rm jobName`'
+    exit 1
+  fi
+  echo -e "purging job $name"
+  nmd job stop -purge $name
   ;;
 stop)
   name=${2:-""}

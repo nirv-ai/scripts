@@ -8,6 +8,27 @@
 - many of the scripts rely on shell fns [within this public repo](https://github.com/noahehall/theBookOfNoah/tree/master/linux/bash_cli_fns)
 - you can setup your shell to be l33t like me by [sourcing this file](https://github.com/noahehall/theBookOfNoah/blob/master/linux/_sourceme_.sh) in the parent directory
 
+## script.nmd.sh
+
+- actively used for running nomad jobs
+
+```sh
+
+################# basic workflow
+docker compose build
+docker compose convert | yq -r -o=json >.env.${ENV}.compose.json
+# now symlink the .json file to wherever you run nomad cmds
+# symlink this file to the same place
+## prefix all cmds with ./script.nmd.sh poop poop poop
+## poop being onef the below
+create job myJobName
+get plan myJobName
+run job myJobName
+stop job myJobName
+rm myJobName
+
+```
+
 ## script.vault.sh
 
 - actively used for interacting with a tls vault server behind a tls proxy
