@@ -18,6 +18,7 @@
 set -eu
 
 # required
+## e.g. export REG_CERTS_PATH=apps/nirvai-core-letsencrypt/dev-nirv-ai
 REG_CERTS_PATH=${REG_CERTS_PATH:?REG_CERTS_PATH not set: exiting}
 
 # optional
@@ -47,26 +48,25 @@ volumes() {
 run_reg() {
   volumes
 
-  if ! test -d "$REG_CERTS_PATH"; then
+  real_certs_path="$(pwd)/$REG_CERTS_PATH"
+  if ! test -d "$real_certs_path"; then
     echo
-    echo "$REG_CERTS_PATH not found"
+    echo "$real_certs_path not found"
     exit 1
   fi
 
   portmap="$REG_HOST_PORT:$REG_CONT_PORT"
-  storage="$REG_VOL_NAME:/var/lib/registry"
-  certs="$REG_CERTS_PATH:/etc/ssl/certs/$REG_DOMAIN/$REG_SUBD"
 
   echo
-  echo "creating registry: $REG_NAME:$REG_HOST_PORT"
-  echo "\tstore: $storage"
-  echo "\tcerts: $certs"
+  echo "creating registry: $REG_NAME on $portmap"
+  echo "\tstore: $REG_VOL_NAME"
+  echo "\tcerts: $real_certs_path"
 
   docker run -d -p $portmap \
-    --name $REG_NAME registry:2 \
-    --restart=always \
-    -v $storage \
-    -v $certs
+    --name $REG_NAME \
+    -v "$REG_VOL_NAME:/var/lib/registry" \
+    -v "$real_certs_path:/etc/ssl/certs/$REG_DOMAIN/$REG_SUBD" \
+    registry:2
 
   if [ "$?" -ne 0 ]; then
     echo "$REG_NAME already created: restarting..."
@@ -105,9 +105,13 @@ tag)
   push_img $thisImage
   ;;
 reset)
-  echo 'reviewing logs before resetting'
-  id=$(docker inspect --format="{{.Id}}" $REG_NAME)
-  sudo cat /var/lib/docker/containers/$id/$id-json.log | jq || true
+  id=$(docker inspect --format="{{.Id}}" $REG_NAME) 2>/dev/null || true
+  if test ! -z $id; then
+    echo 'reviewing disk logs before resetting: this requires sudo'
+    echo "id of previous registry: $id"
+    logfile="/var/lib/docker/containers/$id/$id-json.log"
+    sudo cat $logfile | jq
+  fi
 
   echo
   echo "resetting $REG_NAME"
