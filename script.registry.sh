@@ -69,6 +69,7 @@ run_reg() {
 
   docker run -d -p $portmap \
     --name $REG_NAME \
+    --restart unless-stopped \
     -v "$REG_VOL_NAME:/var/lib/registry" \
     -v "$real_certs_path:/etc/ssl/certs/$REG_DOMAIN/$REG_SUBD" \
     registry:2
@@ -102,19 +103,33 @@ tag_image() {
   docker tag $thisImage $(get_img_fqdn $thisImage)
   push_img $thisImage
 }
+tag_running_containers() {
+  echo 'tagging & pushing all running containers'
+  echo 'if you dont to persist changes, stop and restart the container(s) first'
+  # echo $(docker inspect nirvai_core_ui | jq '.[] | {sha: .Image, name: .Name}')
 
+  # haha got lucky on this one, docker format has 0 documentation
+  docker ps --format '{{json .}}' | jq '.Image' | while IFS= read -r cunt; do
+    echo
+    echo "processing cunt: $cunt"
+    # xargs removes unquotes the cunts name
+    cuntWithoutQuotes=$(echo $cunt | xargs)
+
+    tag_image $cuntWithoutQuotes
+  done
+}
 reset() {
   docker container stop $REG_FQDN
   docker container rm -v $REG_FQDN
 }
 
-cmds='start|pull'
+cmds='run|reset|tag|tag_running'
 
 case $1 in
 run) run_reg ;;
 reset) reset_reg ;;
-push) ${99:?'syntax "push imageName"'} && pull_img "$2" ;;
 tag) tag_image $2 ;;
+tag_running) tag_running_containers ;;
 *)
   echo
   echo "commands: $cmds"
