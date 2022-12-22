@@ -77,7 +77,7 @@ core*)
   docker system prune -a
   docker stop $(docker ps -a -q) || true
   docker rm $(docker ps -a -q) || true
-  docker rmi $(docker images -a -q) || true
+  # docker rmi $(docker images -a -q) || true
   create_volumes
   build
   up
