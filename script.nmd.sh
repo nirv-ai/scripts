@@ -1,23 +1,24 @@
 #!/usr/bin/env bash
-###########
-# @see https://github.com/hashicorp/nomad
-##########
 
 #########
+# @see https://github.com/hashicorp/nomad
+#########
+
+#########
+# FYI
 # the UI is available at http://localhost:4646
 # nomad doesnt work well with docker desktop, remove it
 #########
 
-########
+#########
 # this expects your files to be named
-# ENV.jobName.nomad
-# .env.ENV.compose.json
+# ENV.jobName.nomad (auto created by this script)
+# .env.ENV.compose.json (see below)
 # check nirvai/scripts for automatically creating the .env...compose file
-#######
+# you can then symlink `ln -s jsonfilename ./`
+#########
 
 set -eu
-
-ENV=${ENV:-development}
 
 nmd() {
   for arg in $@; do
@@ -36,6 +37,7 @@ nmd() {
   sudo nomad "$@"
 }
 
+ENV=${ENV:-development}
 nmdhelp='get|create|start|run|stop'
 nmdcmd=${1:-help}
 
