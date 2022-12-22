@@ -120,6 +120,10 @@ ln -s ../../../../scripts/script.nmd.sh .
 ./script.nmd.sh start -config=development.leader.nomad
 ./script.nmd.sh get status team
 
+# optionally reset everything to a green state
+./script.nmd.sh rm dev_core
+nomad system gc
+
 # create a job plan and get job index number
 ./script.nmd.sh get plan dev_core
 
