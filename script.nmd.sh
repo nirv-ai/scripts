@@ -2,6 +2,10 @@
 
 #########
 # @see https://github.com/hashicorp/nomad
+# @see https://discuss.hashicorp.com/t/failed-to-find-plugin-bridge-in-path/3095
+## ^ need to enable cni plugin
+# @see https://developer.hashicorp.com/nomad/docs/drivers/docker#enabled-1
+## need to enable bind mounts
 #########
 
 #########
