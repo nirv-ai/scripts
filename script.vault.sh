@@ -1,11 +1,5 @@
 #!/usr/bin/env bash
 
-# @see https://curl.se/docs/manpage.html
-# @see https://stedolan.github.io/jq/manual/
-# @see https://developer.hashicorp.com/vault/api-docs/secret/kv/kv-v2
-# via the CLI you can append `--output-policy`
-## to see the policy needed to execute a cmd
-
 set -eu
 
 ADDR="${VAULT_ADDR:?VAULT_ADDR not set: exiting}/v1"

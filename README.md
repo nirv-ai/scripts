@@ -1,6 +1,6 @@
 # nirvai scripts
 
-- [documentation is kept in nirvai/docs repo](https://github.com/nirv-ai/docs/blob/main/shell/scripts.md)
+- [documentation is kept in nirvai/docs repo](https://github.com/nirv-ai/docs/blob/main/scripts/README.md)
 
 ## RACEXP
 
