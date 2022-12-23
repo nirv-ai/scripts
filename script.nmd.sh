@@ -6,17 +6,25 @@ nmd() {
   for arg in $@; do
     if [[ $arg = -config* || $arg = *.nomad ]]; then
       path=${arg#*=}
-      echo -e "formatting and validating file: $path"
+      echo -e "formatting file: $path"
       nomad fmt -check "$path"
       if [[ $arg = -config* ]]; then
+        echo -e "validating file: $path"
         nomad config validate "$path"
       fi
     fi
   done
 
-  echo -e "running: nomad $@"
-  echo ""
-  sudo nomad "$@"
+  # @see https://askubuntu.com/questions/750419/how-do-i-run-a-sudo-command-needing-password-input-in-the-background
+  # cant use `cmd poop &` instead use sudo -b
+  echo
+  if [ "$1" = "agent" ]; then
+    echo -e "running agent: sudo -b nomad $@"
+    sudo -b nomad "$@"
+  else
+    echo -e "executing cmd: sudo nomad $@"
+    sudo nomad "$@"
+  fi
 }
 
 ENV=${ENV:-development}
@@ -33,10 +41,10 @@ start)
     exit 1
   fi
   if [[ $config =~ "noconf" ]]; then
-    echo -e "starting server agent(s) in dev mode with sudo"
+    echo -e "starting server & client agent(s) in dev mode with sudo"
     nmd agent -dev -bind 0.0.0.0 -log-level INFO
   fi
-  echo -e "starting server agent(s) with supplied config(s): ${@:2}"
+  echo -e "starting agent(s) with supplied config(s): ${@:2}"
   nmd agent "${@:2}"
   ;;
 create)
