@@ -6,7 +6,7 @@ set -eu
 
 # required
 ## e.g. export REG_CERTS_PATH=apps/nirvai-core-letsencrypt/dev-nirv-ai
-REG_CERTS_PATH=${REG_CERTS_PATH:?REG_CERTS_PATH not set: exiting}
+REG_CERTS_PATH=${REG_CERTS_PATH:-apps/nirvai-core-letsencrypt/dev-nirv-ai}
 
 # optional
 REG_DOMAIN=${REG_DOMAIN:-nirv.ai}
