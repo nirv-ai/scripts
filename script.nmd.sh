@@ -2,29 +2,77 @@
 
 set -eu
 
+NOMAD_ADDR_SUBD=${ENV:-dev}
+NOMAD_ADDR_HOST=${NOMAD_ADDR_HOST:-nirv.ai}
+NOMAD_SERVER_PORT="${NOMAD_SERVER_PORT:-4646}"
+NOMAD_ADDR="${NOMAD_ADDR:-https://${NOMAD_ADDR_SUBD}.${NOMAD_ADDR_HOST}:${NOMAD_SERVER_PORT}}"
+NOMAD_CACERT="${NOMAD_CACERT:-./tls/nomad-ca.pem}"
+NOMAD_CLIENT_CERT="${NOMAD_CLIENT_CERT:-./tls/cli.pem}"
+NOMAD_CLIENT_KEY="${NOMAD_CLIENT_KEY:-./tls/cli-key.pem}"
+
 nmd() {
-  for arg in $@; do
-    if [[ $arg = -config* || $arg = *.nomad ]]; then
-      path=${arg#*=}
-      echo -e "formatting file: $path"
-      nomad fmt -check "$path"
-      if [[ $arg = -config* ]]; then
-        echo -e "validating file: $path"
-        nomad config validate "$path"
+  # dont process job init commands, as theres no config to validate/check
+  if test "$*" = "${*#job init}"; then
+    for arg in $@; do
+      if [[ $arg = -config* || $arg = *.nomad ]]; then
+        path=${arg#*=}
+        echo -e "formatting file: $path"
+        nomad fmt -check "$path"
+        if [[ $arg = -config* ]]; then
+          echo -e "validating file: $path"
+          nomad config validate "$path"
+        fi
       fi
-    fi
-  done
+    done
+  fi
 
   # @see https://askubuntu.com/questions/750419/how-do-i-run-a-sudo-command-needing-password-input-in-the-background
   # cant use `cmd poop &` instead use sudo -b
   echo
-  if [ "$1" = "agent" ]; then
-    echo -e "running agent: sudo -b nomad $@"
-    sudo -b nomad "$@"
-  else
-    echo -e "executing cmd: sudo nomad $@"
-    sudo nomad "$@"
-  fi
+  case $1 in
+  agent)
+    echo -e "running agent without conf in devmode: sudo -b nomad $@ [tls-options]"
+    sudo -b nomad "$@" \
+      -ca-cert=$NOMAD_CACERT \
+      -client-cert=$NOMAD_CLIENT_CERT \
+      -client-key=$NOMAD_CLIENT_KEY \
+      -address=$NOMAD_ADDR
+    ;;
+  plan | status)
+    echo -e "executing: sudo nomad $1 [tls-options] ${@:2}"
+    echo
+    sudo nomad $1 \
+      -ca-cert=$NOMAD_CACERT \
+      -client-cert=$NOMAD_CLIENT_CERT \
+      -client-key=$NOMAD_CLIENT_KEY \
+      -address=$NOMAD_ADDR \
+      "${@:2}"
+    ;;
+  job | node | alloc)
+    case $2 in
+    run | status | logs | run | stop)
+      echo -e "executing: sudo nomad $1 $2 [tls-options] ${@:3}"
+      echo
+      sudo nomad $1 $2 \
+        -ca-cert=$NOMAD_CACERT \
+        -client-cert=$NOMAD_CLIENT_CERT \
+        -client-key=$NOMAD_CLIENT_KEY \
+        -address=$NOMAD_ADDR \
+        "${@:3}"
+      ;;
+    *) echo -e "cmd not setup for nmd: $@ " ;;
+    esac
+    ;;
+  *)
+    echo -e "executing: sudo nomad $@ [tls-options]"
+    sudo nomad "$@" \
+      -ca-cert=$NOMAD_CACERT \
+      -client-cert=$NOMAD_CLIENT_CERT \
+      -client-key=$NOMAD_CLIENT_KEY \
+      -address=$NOMAD_ADDR
+    ;;
+  esac
+
 }
 
 ENV=${ENV:-development}
@@ -63,9 +111,9 @@ create)
     fi
 
     echo -e "creating new job $3.nomad in the current dir"
-    nmd job init -short "$ENV.$name.nomad"
+    nomad job init -short "$ENV.$name.nomad"
     echo -e "updating job name in $ENV.$name.nomad"
-    sed -i "/job \"example\"/c\job \"$name\" {" "./$ENV.$name.nomad"
+    sudo sed -i "/job \"example\"/c\job \"$name\" {" "./$ENV.$name.nomad"
     ;;
   *) echo -e "syntax: create job|gossipkey." ;;
   esac
@@ -158,7 +206,7 @@ get)
     echo -e "creating job plan for $name"
     echo -e "\tto use this script to submit the job"
     echo -e "\texecute: run $name indexNumber"
-    nmd job plan -var-file=.env.$ENV.compose.json "$ENV.$name.nomad"
+    nmd plan -var-file=.env.$ENV.compose.json "$ENV.$name.nomad"
     ;;
   *) echo -e $gethelp ;;
   esac
