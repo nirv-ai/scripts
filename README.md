@@ -133,11 +133,16 @@ nomad system gc
 ./script.nmd.sh get plan dev_core
 
 # deploy dev_core
-# on error run
 ./script.nmd.sh run dev_core indexNumber
-./script.nmd.sh get status loc allocationId # in event of deployment failure
-./script.nmd.sh dockerlogs # following docker logs of all running containers
 
+# on error run
+./script.nmd.sh get status job jobId # todo
+./script.nmd.sh get status loc allocationId # in event of deployment failure
+./script.nmd.sh get status node # see nodes and there ids
+./script.nmd.sh dockerlogs # following docker logs of all running containers
+nomad alloc exec -i -t -task sidekiq fa2b2ed6 /bin/bash # todo,
+nomad alloc exec -i -t -task puma fa2b2ed6 /bin/bash -c "bundle exec rails c" #todo
+nomad job history -p job_name # todo
 ###################### USAGE
 ## prefix all cmds with ./script.nmd.sh poop poop poop
 ## poop being one of the below

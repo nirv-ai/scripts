@@ -30,7 +30,7 @@ volumes() {
 }
 
 push_img() {
-  image=$(get_img_fqdn $1)
+  image=${1:?'cant push: image must be a valid identifier'}
   echo "pushing image: $image"
   docker push $image
 }
@@ -89,9 +89,20 @@ reset_reg() {
 
 tag_image() {
   thisImage=${1:?'syntax "tag thisImage:tagName"'}
+
   echo
-  echo "tagging and pushing: $thisImage"
-  docker tag $thisImage $(get_img_fqdn $thisImage)
+  echo "received image for tagging: $thisImage"
+
+  case $thisImage in
+  $REG_FQDN*) echo 'image already tagged' ;;
+  *)
+    echo
+    echo 'tagging image'
+    docker tag $thisImage $(get_img_fqdn $thisImage)
+    ;;
+  esac
+  echo
+  echo 'pushing image'
   push_img $thisImage
 
   echo "removing (ignore if fail) original image sourced from hub"

@@ -17,7 +17,7 @@ POSTGRES_VOL_NAME=${SERVICE_PREFIX}_core_postgres
 ENV=${NODE_ENV:-development}
 
 create_volumes() {
-  docker volume create $POSTGRES_VOL_NAME
+  docker volume create $POSTGRES_VOL_NAME || true
 }
 
 build() {
@@ -60,13 +60,10 @@ core*)
     echo "container for service $1 already dead"
   else
     docker container rm ${SERVICE_PREFIX}_${1}
-    if [[ $1 == *"postgres" ]]; then
-      echo "recreating $1 volumes"
-      docker volume rm $POSTGRES_VOL_NAME
-      create_volumes
-    fi
   fi
   docker container prune -f
+  docker volume prune
+  create_volumes
   echo "restarting server $1"
   docker compose build --no-cache $1
   docker compose up -d $1 --remove-orphans
