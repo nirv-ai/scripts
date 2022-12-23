@@ -1,8 +1,8 @@
-#!/usr/bin/env bash
+#!/usr/bin/env sh
 
 set -eu
 
-NAME_PREFIX=${NAME_PREFIX:-nirvai_core_}
+NAME_PREFIX=${CUNT_NAME_PREFIX:-nirvai_}
 
 if [ "$#" -eq 0 ]; then
   echo "please provide a docker compose service name"
