@@ -94,23 +94,26 @@ tag_image() {
   echo "received image for tagging: $thisImage"
 
   case $thisImage in
-  $REG_FQDN*) echo 'image already tagged' ;;
-  *)
+  $REG_FQDN*)
     echo
-    echo 'tagging image'
-    docker tag $thisImage $(get_img_fqdn $thisImage)
+    echo 'image already tagged: pushing image'
+    push_img $thisImage
+    ;;
+  *)
+    taggedImage=$(get_img_fqdn $thisImage)
+    echo "image taged: $taggedImage"
+    docker tag $thisImage $taggedImage
+    push_img $taggedImage
+    echo "removing (ignore if fail) original image and keeping new tagged image"
+    docker image remove -f $thisImage || true
     ;;
   esac
-  echo
-  echo 'pushing image'
-  push_img $thisImage
 
-  echo "removing (ignore if fail) original image sourced from hub"
-  docker image remove -f $thisImage || true
   # docker rmi -f $(docker images --filter="reference=*/*:latest*" -q)
 }
 tag_running_containers() {
-  echo 'tagging & pushing all running containers images'
+  echo 'tagging & pushing images for running containers:'
+  echo "$(docker ps --format '{{json .}}' | jq '.Image')"
   # echo $(docker inspect nirvai_core_ui | jq '.[] | {sha: .Image, name: .Name}')
 
   # haha got lucky on this one, docker format has 0 documentation

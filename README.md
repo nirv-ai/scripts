@@ -69,7 +69,7 @@ export REG_HOST_PORT=5000
 
 > run: runs a registry
 > reset: purges and restarts a registry
-> tag: tags an image and pushes it to registry
+> tag: tag a single image and pushes it to registry
 > tag_running: tags the image of all running containers and pushes all to registry
 
 ```
