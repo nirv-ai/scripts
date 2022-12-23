@@ -32,31 +32,34 @@ nmd() {
   # dont rely on environment vars to be set because we run with set -u
   # tls defaults to dev.nirv.ai configuration in ./tls dir
   echo
+  echo -e "using tls options"
+  echo -e "NOMAD_ADDR: $NOMAD_ADDR"
+  echo -e "NOMAD_CACERT: $NOMAD_CACERT"
+  echo -e "NOMAD_CLIENT_CERT: $NOMAD_CLIENT_CERT"
+  echo -e "NOMAD_CLIENT_KEY: $NOMAD_CLIENT_KEY"
+  echo
+
   case $1 in
-  agent)
-    echo -e "running agent without conf in devmode: sudo -b nomad $@ [tls-options]"
-    sudo -b nomad "$@" \
-      -ca-cert=$NOMAD_CACERT \
-      -client-cert=$NOMAD_CLIENT_CERT \
-      -client-key=$NOMAD_CLIENT_KEY \
-      -address=$NOMAD_ADDR
+  server | client)
+    echo -e "starting $1: sudo -b nomad agent ${@:2}"
+    sudo -b nomad agent "${@:2}"
     ;;
   plan | status)
-    echo -e "executing: sudo nomad $1 [tls-options] ${@:2}"
     echo
-    sudo nomad $1 \
-      -ca-cert=$NOMAD_CACERT \
-      -client-cert=$NOMAD_CLIENT_CERT \
-      -client-key=$NOMAD_CLIENT_KEY \
-      -address=$NOMAD_ADDR \
+    echo -e "executing: sudo nomad $1 [tls-options] ${@:2}"
+    sudo nomad "$1" \
+      -ca-cert="$NOMAD_CACERT" \
+      -client-cert="$NOMAD_CLIENT_CERT" \
+      -client-key="$NOMAD_CLIENT_KEY" \
+      -address="$NOMAD_ADDR" \
       "${@:2}"
     ;;
-  job | node | alloc)
+  job | node | alloc | system)
     case $2 in
-    run | status | logs | run | stop)
+    run | status | logs | run | stop | gc)
       echo -e "executing: sudo nomad $1 $2 [tls-options] ${@:3}"
       echo
-      sudo nomad $1 $2 \
+      sudo nomad "$1" "$2" \
         -ca-cert=$NOMAD_CACERT \
         -client-cert=$NOMAD_CLIENT_CERT \
         -client-key=$NOMAD_CLIENT_KEY \
@@ -83,20 +86,18 @@ nmdhelp='get|create|start|run|stop|rm|dockerlogs'
 nmdcmd=${1:-help}
 
 case $nmdcmd in
+gc)
+  nmd system gc
+  ;;
 start)
-  config=${2:-""}
-  if [[ -z $config ]]; then
-    echo -e 'you must explicity disable or provide server config(s)'
-    echo -e '\t syntax (dev mode): `start noconf`'
-    echo -e '\t syntax: `start -config=X -config=Y ...`'
-    exit 1
-  fi
-  if [[ $config =~ "noconf" ]]; then
-    echo -e "starting server & client agent(s) in dev mode with sudo"
-    nmd agent -dev -bind 0.0.0.0 -log-level INFO
-  fi
-  echo -e "starting agent(s) with supplied config(s): ${@:2}"
-  nmd agent "${@:2}"
+  what=${2:-""}
+  case $what in
+  server | client) nmd "${@:2}" ;;
+  *)
+    echo -e 'syntax: start [server|client] -config=x -config=y ....'
+    exit 0
+    ;;
+  esac
   ;;
 create)
   what=${2:-""}
