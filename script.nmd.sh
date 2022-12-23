@@ -28,6 +28,9 @@ nmd() {
 
   # @see https://askubuntu.com/questions/750419/how-do-i-run-a-sudo-command-needing-password-input-in-the-background
   # cant use `cmd poop &` instead use sudo -b
+  # we also need to specificly set where the TLS options go
+  # dont rely on environment vars to be set because we run with set -u
+  # tls defaults to dev.nirv.ai configuration in ./tls dir
   echo
   case $1 in
   agent)
