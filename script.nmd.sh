@@ -26,6 +26,16 @@ nmd() {
     done
   fi
 
+  # tls options should be specified in configs
+  case $1 in
+  s | c)
+    what=$(test "$1" = 'c' && echo 'client' || echo 'server')
+    echo -e "starting $what: sudo -b nomad agent ${@:2}"
+    sudo -b nomad agent "${@:2}"
+    exit 1
+    ;;
+  esac
+
   # @see https://askubuntu.com/questions/750419/how-do-i-run-a-sudo-command-needing-password-input-in-the-background
   # cant use `cmd poop &` instead use sudo -b
   # we also need to specificly set where the TLS options go
@@ -37,13 +47,9 @@ nmd() {
   echo -e "NOMAD_CACERT: $NOMAD_CACERT"
   echo -e "NOMAD_CLIENT_CERT: $NOMAD_CLIENT_CERT"
   echo -e "NOMAD_CLIENT_KEY: $NOMAD_CLIENT_KEY"
-  echo
+  echo ""
 
   case $1 in
-  server | client)
-    echo -e "starting $1: sudo -b nomad agent ${@:2}"
-    sudo -b nomad agent "${@:2}"
-    ;;
   plan | status)
     echo
     echo -e "executing: sudo nomad $1 [tls-options] ${@:2}"
@@ -92,7 +98,7 @@ gc)
 start)
   what=${2:-""}
   case $what in
-  server | client) nmd "${@:2}" ;;
+  s | c) nmd "${@:2}" ;;
   *)
     echo -e 'syntax: start [server|client] -config=x -config=y ....'
     exit 0
@@ -141,7 +147,7 @@ get)
     fi
     case $3 in
     team)
-      echo -e "retrieving members of gossip ring"
+      echo -e "retrieving [server] members"
       nmd server members -detailed
       ;;
     node)
