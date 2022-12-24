@@ -52,6 +52,8 @@ get_payload_path() {
 
   echo "$(pwd)/$path"
 }
+
+####################### REQUESTS
 vault_curl() {
   curl -v --url $1 "${@:2}" | jq
 }
@@ -61,12 +63,15 @@ vault_curl_auth() {
 vault_list() {
   vault_curl "$1" -X LIST -H "$TOKEN_HEADER"
 }
-
-vault_post_data() {
-  vault_curl_auth $2 --data "$1"
+vault_post_no_data() {
+  vault_curl "$1" -X LIST -H "$TOKEN_HEADER"
 }
+vault_post_data() {
+  vault_curl_auth $1 -X POST
+}
+
 vault_post_data_no_auth() {
-  vault_curl $2 --data "$1"
+  vault_curl_auth $2 --data "$1"
 }
 vault_put_data() {
   vault_curl_auth $2 -X PUT --data "$1"
@@ -74,6 +79,8 @@ vault_put_data() {
 vault_patch_data() {
   vault_curl_auth $2 -X PATCH --data "$1"
 }
+
+#################### DATA
 data_type_only() {
   local data=$(
     jq -n -c \
@@ -316,6 +323,58 @@ renew)
   axor)
     # data_axor_only $1 ADDR/TOKEN_RENEW_AXOR
     echo -e "renewing token via accessors not setup"
+    ;;
+  esac
+  ;;
+revoke)
+  revokewhat=${2-''}
+  $id=${3:-''}
+
+  case $revokewhat in
+  token)
+    if test -v $id; then
+      echo -e 'syntax: revoke token tokenId'
+      exit 1
+    fi
+
+    data=$(data_token_only $id)
+    echo -e "revoking token: $data"
+    vault_post_data $data $ADDR/$TOKEN_REVOKE_ID
+    ;;
+  axor)
+    if test -v $id; then
+      echo -e 'syntax: revoke axor accessorId'
+      exit 1
+    fi
+
+    data=$(data_axor_only $id)
+    echo -e "revoking token via accessor: $data"
+    vault_post_data $data $ADDR/$TOKEN_REVOKE_AXOR
+    ;;
+  parent)
+    if test -v $id; then
+      echo -e 'syntax: revoke parent tokenId'
+      exit 1
+    fi
+
+    data=$(data_token_only $id)
+    echo -e "revoking parent & parent secrets, orphaning children: $data"
+    vault_post_data $data $ADDR/$TOKEN_REVOKE_PARENT
+    ;;
+  self)
+    echo -e "good bye!"
+    vault_post_no_data $ADDR/$TOKEN_REVOKE_SELF
+    ;;
+  esac
+  ;;
+rm)
+  rmwhat=${2:-''}
+  id=${3:-''}
+
+  case $rmwhat in
+  token-role)
+    # -X auth/token/roles/$id
+    echo -e 'delete token role not setup'
     ;;
   esac
   ;;
