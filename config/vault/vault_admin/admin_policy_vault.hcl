@@ -1,4 +1,4 @@
-# nirv admins have everything but sudo
+# you should have more eyeballs than vault admins
 path "secret/*" {
   capabilities = [ "create", "read", "update", "delete", "list", "sudo"]
 }
