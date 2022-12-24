@@ -57,8 +57,8 @@ get_payload_path() {
 ####################### REQUESTS
 vault_curl() {
   if [ "$DEBUG" = 1 ]; then
-    echo -e '[DEBUG] SCRIPT.VAULT.SH\n------------'
-    echo -e "[url]: $1\n[rest]: ${@:2}\n\n------------"
+    echo -e '\n\n[DEBUG] SCRIPT.VAULT.SH\n------------'
+    echo -e "[url]: $1\n[args]: ${@:2}\n------------\n\n"
   fi
 
   curl -v -H "Connection: close" --url $1 "${@:2}" | jq

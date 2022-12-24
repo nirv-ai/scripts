@@ -10,7 +10,14 @@ NOMAD_CACERT="${NOMAD_CACERT:-./tls/nomad-ca.pem}"
 NOMAD_CLIENT_CERT="${NOMAD_CLIENT_CERT:-./tls/cli.pem}"
 NOMAD_CLIENT_KEY="${NOMAD_CLIENT_KEY:-./tls/cli-key.pem}"
 
+DEBUG=${NIRV_SCRIPT_DEBUG:-''}
+
 nmd() {
+  if [ "$DEBUG" = 1 ]; then
+    echo -e '\n\n[DEBUG] SCRIPT.NMD.SH\n------------'
+    echo -e "[cmd]: $1\n[args]: ${@:2}\n------------\n\n"
+  fi
+
   # dont process job init commands, as theres no config to validate/check
   if test "$*" = "${*#job init}"; then
     for arg in $@; do
@@ -32,7 +39,7 @@ nmd() {
     what=$(test "$1" = 'c' && echo 'client' || echo 'server')
     echo -e "starting $what: sudo -b nomad agent ${@:2}"
     sudo -b nomad agent "${@:2}"
-    exit 1
+    exit 0
     ;;
   esac
 
