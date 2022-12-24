@@ -7,6 +7,7 @@ set -eu
 # interface
 ADDR="${VAULT_ADDR:?VAULT_ADDR not set: exiting}/v1"
 TOKEN="${VAULT_TOKEN:?VAULT_TOKEN not set: exiting}"
+DEBUG=${NIRV_SCRIPT_DEBUG:-''}
 
 # vars
 TOKEN_HEADER="X-Vault-Token: $TOKEN"
@@ -55,6 +56,11 @@ get_payload_path() {
 
 ####################### REQUESTS
 vault_curl() {
+  if [ "$DEBUG" = 1 ]; then
+    echo -e '[DEBUG] SCRIPT.VAULT.SH\n'
+    echo -e "request data:\n[url]: $1\n[rest]: ${@:2}"
+  fi
+
   curl -v --url $1 "${@:2}" | jq
 }
 vault_curl_auth() {
@@ -149,7 +155,7 @@ enable)
   ;;
 list)
   case $2 in
-  tokens)
+  axors)
     # @see https://github.com/hashicorp/vault/issues/1115 list only root tokens
     echo -e 'listing all tokens'
     vault_list $ADDR/$AUTH_TOKEN_ACCESSORS
@@ -230,7 +236,7 @@ get)
   case $2 in
   token)
     getwhat=${3:-'syntax: get token [info|axor|self] ...'}
-    tokenId=${4:-''}
+    id=${4:-''}
 
     case $getwhat in
     self)
@@ -238,22 +244,22 @@ get)
       vault_curl_auth $ADDR/$TOKEN_INFO
       ;;
     info)
-      if test -v $tokenId; then
+      if test -v $id; then
         echo -e 'syntax: get token info tokenId'
         exit 1
       fi
 
-      data=$(data_token_only $tokenId)
+      data=$(data_token_only $id)
       echo -e "getting info for token: $data"
       vault_post_data $data $ADDR/$TOKEN_INFO
       ;;
     axor)
-      if test -v $tokenId; then
+      if test -v $id; then
         echo -e 'syntax: get token axor accessorId'
         exit 1
       fi
 
-      data=$(data_axor_only $tokenId)
+      data=$(data_axor_only $id)
       echo -e "getting info for token via accessor id: $data"
       vault_post_data $data $ADDR/$TOKEN_INFO_ACCESSOR
       ;;
