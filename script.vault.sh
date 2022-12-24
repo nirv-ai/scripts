@@ -57,11 +57,11 @@ get_payload_path() {
 ####################### REQUESTS
 vault_curl() {
   if [ "$DEBUG" = 1 ]; then
-    echo -e '[DEBUG] SCRIPT.VAULT.SH\n'
-    echo -e "[url]: $1\n[rest]: ${@:2}\n\n"
+    echo -e '[DEBUG] SCRIPT.VAULT.SH\n------------'
+    echo -e "[url]: $1\n[rest]: ${@:2}\n\n------------"
   fi
 
-  curl -v --url $1 "${@:2}" | jq
+  curl -v -H "Connection: close" --url $1 "${@:2}" | jq
 }
 vault_curl_auth() {
   vault_curl $1 -H "$TOKEN_HEADER" "${@:2}"
@@ -180,6 +180,7 @@ list)
     *) invalid_request ;;
     esac
     ;;
+  *) invalid_request ;;
   esac
   ;;
 create)
@@ -223,7 +224,7 @@ create)
       fi
 
       echo -e "creating child token with payload: $payload_path"
-      vault_post_data $payload_path $ADDR/$TOKEN_CREATE_CHILD
+      vault_post_data "@${payload_path}" $ADDR/$TOKEN_CREATE_CHILD
       ;;
     orphan) echo -e "TODO: creating orphan tokens not setup for payload" ;;
     *) echo -e $syntax ;;
