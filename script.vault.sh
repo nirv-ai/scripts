@@ -4,9 +4,25 @@
 
 set -eu
 
+# interface
 ADDR="${VAULT_ADDR:?VAULT_ADDR not set: exiting}/v1"
 TOKEN="${VAULT_TOKEN:?VAULT_TOKEN not set: exiting}"
+
+# vars
 TOKEN_HEADER="X-Vault-Token: $TOKEN"
+
+# endpoints
+AUTH_APPROLE=auth/approle
+AUTH_APPROLE_ROLE=$AUTH_APPROLE/role
+CREATE_ORPHAN=/auth/token/create-orphan
+SECRET_DATA=secret/data
+SYS_AUTH=sys/auth
+SYS_HEALTH=sys/health
+SYS_MOUNTS=sys/mounts
+SYS_LEASES=sys/leases
+SYS_LEASES_LOOKUP=$SYS_LEASES/lookup
+SYS_LEASES_LOOKUP_DB_CREDS=$SYS_LEASES_LOOKUP/database/creds
+DB_CREDS=database/creds
 
 invalid_request() {
   local INVALID_REQUEST_MSG="invalid request: see root/README.md for help"
@@ -38,7 +54,6 @@ vault_put_data() {
 vault_patch_data() {
   vault_curl_auth $2 -X PATCH --data "$1"
 }
-
 data_type_only() {
   local data=$(
     jq -n -c \
@@ -47,7 +62,6 @@ data_type_only() {
   )
   echo $data
 }
-
 data_login() {
   local data=$(
     jq -n -c \
@@ -57,7 +71,6 @@ data_login() {
   )
   echo $data
 }
-
 data_policies_only() {
   local data=$(
     jq -n -c \
@@ -83,8 +96,8 @@ enable)
 
     URL=$(
       [[ "$2" == secret || "$2" == database ]] &&
-        echo "sys/mounts/$2" ||
-        echo "sys/auth/$2"
+        echo "$SYS_MOUNTS/$2" ||
+        echo "$SYS_AUTH/$2"
     )
     vault_post_data $data "$ADDR/$URL"
     ;;
@@ -94,13 +107,13 @@ enable)
 list)
   case $2 in
   secrets) # doesnt work
-    vault_list "$ADDR/secret/data/$3"
+    vault_list "$ADDR/$SECRET_DATA/$3"
     ;;
   secret-engines)
-    vault_list_get "$ADDR/sys/mounts"
+    vault_list_get "$ADDR/$SYS_MOUNTS"
     ;;
   approles)
-    vault_list "$ADDR/auth/approle/role"
+    vault_list "$ADDR/$AUTH_APPROLE_ROLE"
     ;;
   postgres)
     case $3 in
@@ -108,7 +121,7 @@ list)
       # eg list postgres leases bff
       echo -e "listing provisioned leases for postgres role $4"
 
-      vault_list "$ADDR/sys/leases/lookup/database/creds/$4"
+      vault_list "$ADDR/$SYS_LEASES_LOOKUP_DB_CREDS/$4"
       ;;
     *) invalid_request ;;
     esac
@@ -124,7 +137,7 @@ create)
       data="{\"data\": $5 }"
       echo -e "creating secret at $4 with $data"
 
-      vault_post_data "$data" "$ADDR/secret/data/$4"
+      vault_post_data "$data" "$ADDR/$SECRET_DATA/$4"
       ;;
     *) invalid_request ;;
     esac
@@ -133,25 +146,26 @@ create)
     # eg: create approle-secret bff
     echo -e "creating secret-id for approle $3"
 
-    vault_curl_auth "$ADDR/auth/approle/role/$3/secret-id" -X POST
+    vault_curl_auth "$ADDR/$AUTH_APPROLE_ROLE/$3/secret-id" -X POST
     ;;
   approle)
     # eg: create approle someName role1,role2,role3
     data=$(data_policies_only $4)
     echo -e "upserting approle $3 with policies $data"
 
-    vault_post_data $data "$ADDR/auth/approle/role/$3"
+    vault_post_data $data "$ADDR/$AUTH_APPROLE_ROLE/$3"
     ;;
   token)
+    syntax='syntax: create token [child|orphan] path/to/payload.json'
     tokentype=${3:-''}
     case $tokentype in
     child) echo -e "creation child tokens not setup for payload" ;;
     orphan)
-      payload="${4:?path to payload.json is required}"
+      payload="${4:?$syntax}"
 
       # if test !
       ;;
-    *) echo -e 'syntax: create token [child|orphan] path/to/payload.json' ;;
+    *) echo -e $syntax ;;
     esac
     ;;
   *) invalid_request ;;
@@ -163,25 +177,25 @@ get)
     case $3 in
     creds)
       echo -e "getting postgres creds for dbRole $4"
-      vault_curl_auth "$ADDR/database/creds/$4"
+      vault_curl_auth "$ADDR/$DB_CREDS/$4"
       ;;
     *) invalid_request ;;
     esac
     ;;
   secret)
     # eg: get secret secret/foo
-    vault_curl_auth "$ADDR/secret/data/$3"
+    vault_curl_auth "$ADDR/$SECRET_DATA/$3"
     ;;
   status)
     # eg get status
-    vault_curl "$ADDR/sys/health"
+    vault_curl "$ADDR/$SYS_HEALTH"
     ;;
   creds)
     # eg get creds roleId secretId
     data=$(data_login $3 $4)
     echo -e "getting creds for $3 with $data"
 
-    vault_post_data_no_auth $data "$ADDR/auth/approle/login"
+    vault_post_data_no_auth $data "$ADDR/$AUTH_APPROLE/login"
     ;;
   approle)
     case $3 in
@@ -189,13 +203,13 @@ get)
       # eg get approle info bff
       echo -e "getting info for approle $4"
 
-      vault_curl_auth "$ADDR/auth/approle/role/$4"
+      vault_curl_auth "$ADDR/$AUTH_APPROLE_ROLE/$4"
       ;;
     id)
       # eg: get approle id bff
       echo -e "getting id for approle $4"
 
-      vault_curl_auth "$ADDR/auth/approle/role/$4/role-id"
+      vault_curl_auth "$ADDR/$AUTH_APPROLE_ROLE/$4/role-id"
       ;;
     *) invalid_request ;;
     esac
