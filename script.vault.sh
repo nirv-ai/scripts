@@ -37,21 +37,38 @@ SYS_MOUNTS=sys/mounts
 SYS_LEASES=sys/leases
 SYS_LEASES_LOOKUP=$SYS_LEASES/lookup
 SYS_LEASES_LOOKUP_DB_CREDS=$SYS_LEASES_LOOKUP/database/creds
+SYS_POLY=sys/policies
+SYS_POLY_ACL=$SYS_POLY/acl # -X PUT this/policyName
 DB_CREDS=database/creds
 
+######################## ERROR HANDLING
 invalid_request() {
   local INVALID_REQUEST_MSG="invalid request: @see https://github.com/nirv-ai/docs/blob/main/vault/README.md"
 
   echo -e $INVALID_REQUEST_MSG
 }
+throw_if_file_doesnt_exist() {
+  if test ! -f "$1"; then
+    echo -e "file doesnt exist: $1"
+    exit 1
+  fi
+}
 get_payload_path() {
-  path=${1:?'cant get unknown path: string not provided'}
+  local path=${1:?'cant get unknown path: string not provided'}
+
+  throw_if_file_doesnt_exist $path
 
   # todo: if path starts with / return it
   # todo: if path starts with . throw
   # todo: if path doesnt end with .json throw
 
   echo "$(pwd)/$path"
+}
+get_payload_filename() {
+  local full_path_with_ext=${1:?'cant get unknown path: string not provided'}
+  local file_with_ext="${full_path_with_ext##*/}"
+
+  echo "${file_with_ext%.*}" # file without extension
 }
 
 ####################### REQUESTS
@@ -78,7 +95,6 @@ vault_post_data_no_auth() {
 vault_post_data() {
   vault_curl_auth $2 --data "$1"
 }
-
 vault_put_data() {
   vault_curl_auth $2 -X PUT --data "$1"
 }
@@ -120,7 +136,19 @@ data_login() {
   )
   echo $data
 }
+data_policy_only() {
+  # @see https://gist.github.com/v6/f4683336eb1c4a6a98a0f3cf21e62df2
+  local data=$(
+    printf "{
+    \"policy\": \""
+    cat $1 | sed '/^[[:blank:]]*#/d;s/#.*//' | sed 's/\"/\\\"/g' | tr -d '\n' ##  Remove comments and serialize string
+    printf "\"
+}"
+  )
+  echo "$data"
+}
 data_policies_only() {
+  # TODO: delete these and use data_policy_only
   local data=$(
     jq -n -c \
       --arg policy $1 \
@@ -218,17 +246,23 @@ create)
     child)
       payload="${4:?$syntax}"
       payload_path=$(get_payload_path $payload)
-      if test ! -f "$payload_path"; then
-        echo -e "payload json not found: $payload_path"
-        exit 1
-      fi
 
-      echo -e "creating child token with payload: $payload_path"
+      echo -e "creating child token with payload:$payload_path"
       vault_post_data "@${payload_path}" $ADDR/$TOKEN_CREATE_CHILD
       ;;
     orphan) echo -e "TODO: creating orphan tokens not setup for payload" ;;
     *) echo -e $syntax ;;
     esac
+    ;;
+  poly)
+    syntax='syntax: create poly path/to/distinct_poly_name.hcl'
+    payload="${3:?$syntax}"
+    payload_path=$(get_payload_path $payload)
+    payload_data=$(data_policy_only $payload_path)
+    payload_filename=$(get_payload_filename $payload_path)
+
+    echo -e "creating policy $payload_filename:\n$(cat $payload_path)"
+    vault_post_data "$payload_data" $ADDR/$SYS_POLY_ACL/$payload_filename
     ;;
   *) invalid_request ;;
   esac
