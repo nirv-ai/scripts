@@ -1,0 +1,5 @@
+{
+  "policies": ["default", "reset_pw"],
+  "ttl": "15m",
+  "num_uses": 1
+}

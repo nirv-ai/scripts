@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+# append `--output-policy` to see the policy needed to execute a cmd
+
 set -eu
 
 ADDR="${VAULT_ADDR:?VAULT_ADDR not set: exiting}/v1"

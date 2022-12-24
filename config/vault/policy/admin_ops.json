@@ -1,0 +1,4 @@
+{
+  "policies": ["default", "admin_ops"],
+  "ttl": "24h"
+}

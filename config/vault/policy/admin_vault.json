@@ -1,0 +1,4 @@
+{
+  "policies": ["default", "admin_vault"],
+  "ttl": "1hr"
+}
