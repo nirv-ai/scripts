@@ -58,7 +58,7 @@ get_payload_path() {
 vault_curl() {
   if [ "$DEBUG" = 1 ]; then
     echo -e '[DEBUG] SCRIPT.VAULT.SH\n'
-    echo -e "request data:\n[url]: $1\n[rest]: ${@:2}"
+    echo -e "[url]: $1\n[rest]: ${@:2}\n\n"
   fi
 
   curl -v --url $1 "${@:2}" | jq
@@ -334,7 +334,7 @@ renew)
   ;;
 revoke)
   revokewhat=${2-''}
-  $id=${3:-''}
+  id=${3:-''}
 
   case $revokewhat in
   token)
