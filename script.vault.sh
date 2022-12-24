@@ -18,6 +18,8 @@ AUTH_TOKEN=auth/token
 AUTH_TOKEN_ACCESSORS=$AUTH_TOKEN/accessors
 TOKEN_CREATE_CHILD=$AUTH_TOKEN/create
 TOKEN_CREATE_ORPHAN=$AUTH_TOKEN/create-orphan
+TOKEN_INFO=$AUTH_TOKEN/lookup
+TOKEN_INFO_ACCESSOR=$AUTH_TOKEN/lookup-accessor
 SECRET_DATA=secret/data
 SYS_AUTH=sys/auth
 SYS_HEALTH=sys/health
@@ -68,6 +70,22 @@ data_type_only() {
     jq -n -c \
       --arg type $1 \
       '{ "type":$type }'
+  )
+  echo $data
+}
+data_token_only() {
+  local data=$(
+    jq -n -c \
+      --arg tokenId $1 \
+      '{ "token":$tokenId }'
+  )
+  echo $data
+}
+data_axor_only() {
+  local data=$(
+    jq -n -c \
+      --arg axorId $1 \
+      '{ "accessor":$axorId }'
   )
   echo $data
 }
@@ -194,6 +212,34 @@ create)
   ;;
 get)
   case $2 in
+  token)
+    getwhat=${3:-'syntax: get token [info|axor] ...'}
+    case $getwhat in
+    info)
+      tokenId=${4:-''}
+      if test -v $tokenId; then
+        echo -e 'syntax: get token info tokenId'
+        exit 1
+      fi
+
+      data=$(data_token_only $tokenId)
+      echo -e "getting info for token: $data"
+      vault_post_data $data $ADDR/$TOKEN_INFO
+      ;;
+    axor)
+      axorId=${4:-''}
+      if test -v $axorId; then
+        echo -e 'syntax: get token axor accessorId'
+        exit 1
+      fi
+
+      data=$(data_axor_only $axorId)
+      echo -e "getting info for token via accessor id: $data"
+      vault_post_data $data $ADDR/$TOKEN_INFO_ACCESSOR
+      ;;
+    *) echo -e $getwhat ;;
+    esac
+    ;;
   postgres)
     case $3 in
     creds)
