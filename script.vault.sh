@@ -24,6 +24,11 @@ TOKEN_INFO_SELF=$AUTH_TOKEN/lookup-self
 TOKEN_RENEW_ID=$AUTH_TOKEN/renew
 TOKEN_RENEW_SELF=$AUTH_TOKEN/renew-self
 TOKEN_RENEW_AXOR=$AUTH_TOKEN/renew-accessor
+TOKEN_REVOKE_ID=$AUTH_TOKEN/revoke
+TOKEN_REVOKE_SELF=$AUTH_TOKEN/revoke-self
+TOKEN_REVOKE_AXOR=$AUTH_TOKEN/revoke-accessor
+TOKEN_REVOKE_PARENT=$AUTH_TOKEN/revoke-orphan #children become orphans, parent secrets revoked
+TOKEN_ROLES=$AUTH_TOKEN/roles                 # this/roleId [-X [DELETE | POST]] | this -X LIST
 SECRET_DATA=secret/data
 SYS_AUTH=sys/auth
 SYS_HEALTH=sys/health
@@ -309,7 +314,7 @@ renew)
     echo -e "renewing token ids not setup"
     ;;
   axor)
-    # data_token_only $1 ADDR/TOKEN_RENEW_AXOR
+    # data_axor_only $1 ADDR/TOKEN_RENEW_AXOR
     echo -e "renewing token via accessors not setup"
     ;;
   esac
