@@ -1,4 +1,0 @@
-{
-  "policies": ["default", "admin_dev"],
-  "ttl": "24h"
-}

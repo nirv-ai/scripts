@@ -1,4 +1,0 @@
-{
-  "policies": ["default", "infra"],
-  "period": "30d"
-}

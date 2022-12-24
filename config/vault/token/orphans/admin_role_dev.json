@@ -1,0 +1,6 @@
+{
+  "allowed_policies": ["default", "admin_dev"],
+  "ttl": "24h",
+  "explicit_max_ttl": "7d",
+  "no_parent": true
+}

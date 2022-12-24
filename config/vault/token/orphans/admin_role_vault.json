@@ -1,0 +1,6 @@
+{
+  "allowed_policies": ["default", "admin_vault"],
+  "ttl": "1hr",
+  "explicit_max_ttl": "7d",
+  "no_parent": true
+}
