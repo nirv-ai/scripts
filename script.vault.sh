@@ -30,7 +30,7 @@ SYS_LEASES_LOOKUP_DB_CREDS=$SYS_LEASES_LOOKUP/database/creds
 DB_CREDS=database/creds
 
 invalid_request() {
-  local INVALID_REQUEST_MSG="invalid request: see root/README.md for help"
+  local INVALID_REQUEST_MSG="invalid request: @see https://github.com/nirv-ai/docs/blob/main/vault/README.md"
 
   echo -e $INVALID_REQUEST_MSG
 }
