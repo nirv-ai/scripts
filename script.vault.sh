@@ -70,15 +70,15 @@ vault_list() {
   vault_curl "$1" -X LIST -H "$TOKEN_HEADER"
 }
 vault_post_no_data() {
-  vault_curl "$1" -X LIST -H "$TOKEN_HEADER"
+  vault_curl "$1" -X POST -H "$TOKEN_HEADER"
+}
+vault_post_data_no_auth() {
+  vault_curl $2 --data "$1"
 }
 vault_post_data() {
-  vault_curl_auth $1 -X POST
-}
-
-vault_post_data_no_auth() {
   vault_curl_auth $2 --data "$1"
 }
+
 vault_put_data() {
   vault_curl_auth $2 -X PUT --data "$1"
 }
