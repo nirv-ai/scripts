@@ -21,6 +21,9 @@ TOKEN_CREATE_ORPHAN=$AUTH_TOKEN/create-orphan
 TOKEN_INFO=$AUTH_TOKEN/lookup
 TOKEN_INFO_ACCESSOR=$AUTH_TOKEN/lookup-accessor
 TOKEN_INFO_SELF=$AUTH_TOKEN/lookup-self
+TOKEN_RENEW_ID=$AUTH_TOKEN/renew
+TOKEN_RENEW_SELF=$AUTH_TOKEN/renew-self
+TOKEN_RENEW_AXOR=$AUTH_TOKEN/renew-accessor
 SECRET_DATA=secret/data
 SYS_AUTH=sys/auth
 SYS_HEALTH=sys/health
@@ -291,6 +294,25 @@ get)
   ;;
 help)
   vault_curl_auth "$ADDR/$2?help=1"
+  ;;
+renew)
+  who=${2:-''}
+  tokenId=${3:-''}
+
+  case $who in
+  self)
+    # ADDR/TOKEN_RENEW_SELF
+    echo -e 'renewing self not setup'
+    ;;
+  id)
+    # data_token_only $1 ADDR/TOKEN_RENEW_ID
+    echo -e "renewing token ids not setup"
+    ;;
+  axor)
+    # data_token_only $1 ADDR/TOKEN_RENEW_AXOR
+    echo -e "renewing token via accessors not setup"
+    ;;
+  esac
   ;;
 *) invalid_request ;;
 esac
