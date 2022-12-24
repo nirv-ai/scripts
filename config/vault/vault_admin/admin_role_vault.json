@@ -1,5 +1,5 @@
 {
-  "allowed_policies": ["default", "admin_vault"],
+  "allowed_policies": ["default", "admin_policy_vault"],
   "ttl": "69d",
   "explicit_max_ttl": "69d",
   "no_parent": true

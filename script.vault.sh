@@ -142,6 +142,18 @@ create)
 
     vault_post_data $data "$ADDR/auth/approle/role/$3"
     ;;
+  token)
+    tokentype=${3:-''}
+    case $tokentype in
+    child) echo -e "creation child tokens not setup for payload" ;;
+    orphan)
+      payload="${4:?path to payload.json is required}"
+
+      # if test !
+      ;;
+    *) echo -e 'syntax: create token [child|orphan] path/to/payload.json' ;;
+    esac
+    ;;
   *) invalid_request ;;
   esac
   ;;
