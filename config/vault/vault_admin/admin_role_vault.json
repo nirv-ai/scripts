@@ -1,6 +1,13 @@
 {
   "allowed_policies": ["default", "admin_policy_vault"],
-  "ttl": "69d",
-  "explicit_max_ttl": "69d",
-  "no_parent": true
+  "display_name": "role: vault admin",
+  "explicit_max_ttl": "",
+  "no_parent": true,
+  "num_uses": 0,
+  "renewable": true,
+  "role_name": "admin_role_vault",
+  "ttl": "1656h",
+  "meta": {
+    "created_by_root": 1
+  }
 }

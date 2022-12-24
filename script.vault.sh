@@ -14,7 +14,10 @@ TOKEN_HEADER="X-Vault-Token: $TOKEN"
 # endpoints
 AUTH_APPROLE=auth/approle
 AUTH_APPROLE_ROLE=$AUTH_APPROLE/role
-CREATE_ORPHAN=/auth/token/create-orphan
+AUTH_TOKEN=auth/token
+AUTH_TOKEN_ACCESSORS=$AUTH_TOKEN/accessors
+TOKEN_CREATE_CHILD=$AUTH_TOKEN/create
+TOKEN_CREATE_ORPHAN=$AUTH_TOKEN/create-orphan
 SECRET_DATA=secret/data
 SYS_AUTH=sys/auth
 SYS_HEALTH=sys/health
@@ -29,7 +32,15 @@ invalid_request() {
 
   echo -e $INVALID_REQUEST_MSG
 }
+get_payload_path() {
+  path=${1:?'cant get unknown path: string not provided'}
 
+  # todo: if path starts with / return it
+  # todo: if path starts with . throw
+  # todo: if path doesnt end with .json throw
+
+  echo "$(pwd)/$path"
+}
 vault_curl() {
   curl -v --url $1 "${@:2}" | jq
 }
@@ -37,11 +48,9 @@ vault_curl_auth() {
   vault_curl $1 -H "$TOKEN_HEADER" "${@:2}"
 }
 vault_list() {
-  vault_curl_auth $1 -X LIST
+  vault_curl "$1" -X LIST -H "$TOKEN_HEADER"
 }
-vault_list_get() {
-  vault_curl_auth $1
-}
+
 vault_post_data() {
   vault_curl_auth $2 --data "$1"
 }
@@ -106,11 +115,16 @@ enable)
   ;;
 list)
   case $2 in
-  secrets) # doesnt work
+  tokens)
+    # @see https://github.com/hashicorp/vault/issues/1115 list only root tokens
+    echo -e 'listing all tokens'
+    vault_list $ADDR/$AUTH_TOKEN_ACCESSORS
+    ;;
+  secrets)
     vault_list "$ADDR/$SECRET_DATA/$3"
     ;;
   secret-engines)
-    vault_list_get "$ADDR/$SYS_MOUNTS"
+    vault_list "$ADDR/$SYS_MOUNTS"
     ;;
   approles)
     vault_list "$ADDR/$AUTH_APPROLE_ROLE"
@@ -158,13 +172,20 @@ create)
   token)
     syntax='syntax: create token [child|orphan] path/to/payload.json'
     tokentype=${3:-''}
-    case $tokentype in
-    child) echo -e "creation child tokens not setup for payload" ;;
-    orphan)
-      payload="${4:?$syntax}"
 
-      # if test !
+    case $tokentype in
+    child)
+      payload="${4:?$syntax}"
+      payload_path=$(get_payload_path $payload)
+      if test ! -f "$payload_path"; then
+        echo -e "payload json not found: $payload_path"
+        exit 1
+      fi
+
+      echo -e "creating child token with payload: $payload_path"
+      vault_post_data $payload_path $ADDR/$TOKEN_CREATE_CHILD
       ;;
+    orphan) echo -e "TODO: creating orphan tokens not setup for payload" ;;
     *) echo -e $syntax ;;
     esac
     ;;
