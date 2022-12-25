@@ -56,10 +56,19 @@ throw_if_file_doesnt_exist() {
     exit 1
   fi
 }
+throw_if_dir_doesnt_exist() {
+  if test ! -d "$1"; then
+    echo -e "directory doesnt exist: $1"
+    exit 1
+  fi
+}
 get_payload_path() {
   local path=${1:?'cant get unknown path: string not provided'}
 
-  echo "$(pwd)/$path"
+  case $path in
+  "/"*) echo $path ;;
+  *) echo "$(pwd)/$path" ;;
+  esac
 }
 get_payload_filename() {
   local full_path_with_ext=${1:?'cant get unknown path: string not provided'}
@@ -158,6 +167,33 @@ data_policies_only() {
   echo $data
 }
 
+#################### workflow
+## single executions
+create_policy() {
+  syntax='syntax: create_policy [/]path/to/distinct_poly_name.hcl'
+  payload="${1:?$syntax}"
+  payload_path=$(get_payload_path $payload)
+  throw_if_file_doesnt_exist $payload_path
+  payload_data=$(data_policy_only $payload_path)
+  payload_filename=$(get_payload_filename $payload_path)
+
+  echo -e "creating policy $payload_filename:\n$(cat $payload_path)"
+  vault_post_data "$payload_data" $ADDR/$SYS_POLY_ACL/$payload_filename
+}
+## batch prcoesses
+process_policies_in_dir() {
+  policy_dir_full_path="$(pwd)/$1/*"
+  echo -e "\nchecking for policies in: $policy_dir_full_path"
+
+  for file_starts_with_policy_ in $policy_dir_full_path; do
+    case $file_starts_with_policy_ in
+    *"/policy_"*)
+      echo -e "\nprocessing policy: $file_starts_with_policy_\n"
+      create_policy $file_starts_with_policy_
+      ;;
+    esac
+  done
+}
 case $1 in
 enable)
   case $2 in
@@ -253,14 +289,8 @@ create)
     ;;
   poly)
     syntax='syntax: create poly path/to/distinct_poly_name.hcl'
-    payload="${3:?$syntax}"
-    payload_path=$(get_payload_path $payload)
-    throw_if_file_doesnt_exist $payload_path
-    payload_data=$(data_policy_only $payload_path)
-    payload_filename=$(get_payload_filename $payload_path)
-
-    echo -e "creating policy $payload_filename:\n$(cat $payload_path)"
-    vault_post_data "$payload_data" $ADDR/$SYS_POLY_ACL/$payload_filename
+    policy_path=${3:?$syntax}
+    create_policy $policy_path
     ;;
   *) invalid_request ;;
   esac
@@ -415,6 +445,18 @@ rm)
     # -X auth/token/roles/$id
     echo -e 'delete token role not setup'
     ;;
+  esac
+  ;;
+process)
+  processwhat=${2:-''}
+
+  case $processwhat in
+  policy_in_dir)
+    dir=${3:?'syntax: process policy_in_dir /full/path/to/dir'}
+    throw_if_dir_doesnt_exist $dir
+    process_policies_in_dir $dir
+    ;;
+  *) invalid_request ;;
   esac
   ;;
 *) invalid_request ;;
