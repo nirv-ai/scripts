@@ -96,6 +96,9 @@ vault_list() {
 vault_post_no_data() {
   vault_curl "$1" -X POST -H "$TOKEN_HEADER"
 }
+vault_delete() {
+  vault_curl "$1" -X DELETE -H "$TOKEN_HEADER"
+}
 vault_post_data_no_auth() {
   vault_curl $2 --data "$1"
 }
@@ -134,6 +137,22 @@ data_axor_only() {
   )
   echo $data
 }
+data_secret_id_only() {
+  local data=$(
+    jq -n -c \
+      --arg secret_id $1 \
+      '{ "secret_id":$secret_id }'
+  )
+  echo $data
+}
+data_secret_id_axor_only() {
+  local data=$(
+    jq -n -c \
+      --arg secret_id_axor $1 \
+      '{ "secret_id_accessor":$secret_id_axor }'
+  )
+  echo $data
+}
 data_login() {
   local data=$(
     jq -n -c \
@@ -153,19 +172,6 @@ data_policy_only() {
     }"
   )
   echo "$data"
-}
-data_policies_only() {
-  # TODO: delete these and use data_policy_only
-  local data=$(
-    jq -n -c \
-      --arg policy $1 \
-      '{
-        "token_policies": [ $policy ],
-        "token_ttl": "24h",
-        "token_max_ttl": "24h"
-        }'
-  )
-  echo $data
 }
 
 #################### workflow
@@ -219,6 +225,16 @@ create_policy() {
 
   echo -e "creating policy $payload_filename:\n$(cat $payload_path)"
   vault_post_data "$payload_data" $ADDR/$SYS_POLY_ACL/$payload_filename
+}
+create_approle() {
+  syntax='syntax: create_approle [/]path/to/distinct_role.json'
+  payload="${1:?$syntax}"
+  payload_path=$(get_payload_path $payload)
+  throw_if_file_doesnt_exist $payload_path
+  payload_filename=$(get_payload_filename $payload_path)
+
+  echo -e "creating approle $payload_filename:\n$(cat $payload_path)"
+  vault_post_data "@$payload_path" "$ADDR/$AUTH_APPROLE_ROLE/$payload_filename"
 }
 ## batch prcoesses
 process_policies_in_dir() {
@@ -274,6 +290,9 @@ list)
   approles)
     vault_list "$ADDR/$AUTH_APPROLE_ROLE"
     ;;
+  approle-axors)
+    vault_list "$ADDR/$AUTH_APPROLE_ROLE/${3:?'syntax: list approleName'}/secret-id"
+    ;;
   postgres)
     case $3 in
     leases)
@@ -306,14 +325,13 @@ create)
     # eg: create approle-secret bff
     echo -e "creating secret-id for approle $3"
 
-    vault_curl_auth "$ADDR/$AUTH_APPROLE_ROLE/$3/secret-id" -X POST
+    vault_post_no_data "$ADDR/$AUTH_APPROLE_ROLE/$3/secret-id" -X POST
     ;;
   approle)
-    # eg: create approle someName role1,role2,role3
-    data=$(data_policies_only $4)
-    echo -e "upserting approle $3 with policies $data"
+    # eg: create approle [/]path/to/distinct_role_name.json
+    payload_path=${3:?'syntax: create approle path/to/distinct_approle_name.json'}
 
-    vault_post_data $data "$ADDR/$AUTH_APPROLE_ROLE/$3"
+    create_approle $payload_path
     ;;
   token)
     syntax='syntax: create token [child|orphan] path/to/payload.json'
@@ -411,6 +429,24 @@ get)
 
       vault_curl_auth "$ADDR/$AUTH_APPROLE_ROLE/$4/role-id"
       ;;
+    secret-id)
+      echo -e "looking up secret-id for approle $4"
+      syntax='get approle secret-id roleName secretId'
+      rolename=${4:?$syntax}
+      secretid=${5:?$syntax}
+      data=$(data_secret_id_only $secretid)
+
+      vault_post_data "${data}" "$ADDR/$AUTH_APPROLE_ROLE/$rolename/secret-id/lookup"
+      ;;
+    secret-id-axor)
+      echo -e "looking up secret-id accesor for approle $4"
+      syntax='get approle secret-id-axor roleName secretIdAccessor'
+      rolename=${4:?$syntax}
+      secretid=${5:?$syntax}
+      data=$(data_secret_id_axor_only $secretid)
+
+      vault_post_data "${data}" "$ADDR/$AUTH_APPROLE_ROLE/$rolename/secret-id-accessor/lookup"
+      ;;
     *) invalid_request ;;
     esac
     ;;
@@ -478,6 +514,25 @@ revoke)
     echo -e "good bye!"
     vault_post_no_data $ADDR/$TOKEN_REVOKE_SELF
     ;;
+  approle-secret-id)
+    echo -e "revoking secret-id for approle $4"
+    syntax='revoke approle-secret-id roleName secretId'
+    rolename=${3:?$syntax}
+    secretid=${4:?$syntax}
+    data=$(data_secret_id_only $secretid)
+
+    vault_post_data "${data}" "$ADDR/$AUTH_APPROLE_ROLE/$rolename/secret-id/destroy"
+    ;;
+  approle-secret-id-axor)
+    echo -e "revoking secret-id accessor for approle $4"
+    syntax='revoke approle-secret-id-axor roleName secretIdAccessor'
+    rolename=${3:?$syntax}
+    secretidAxor=${4:?$syntax}
+    data=$(data_secret_id_axor_only $secretidAxor)
+
+    vault_post_data "${data}" "$ADDR/$AUTH_APPROLE_ROLE/$rolename/secret-id-accessor/destroy"
+    ;;
+  *) invalid_request ;;
   esac
   ;;
 rm)
@@ -486,9 +541,10 @@ rm)
 
   case $rmwhat in
   token-role)
-    # -X auth/token/roles/$id
+    # -X DELETE? auth/token/roles/$id
     echo -e 'delete token role not setup'
     ;;
+  approle-role) vault_delete "$ADDR/$AUTH_APPROLE_ROLE/${id:?'syntax: rm approle roleName'}" ;;
   esac
   ;;
 process)
