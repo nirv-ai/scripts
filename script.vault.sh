@@ -150,7 +150,7 @@ data_policy_only() {
     \"policy\": \""
     cat $1 | sed '/^[[:blank:]]*#/d;s/#.*//' | sed 's/\"/\\\"/g' | tr -d '\n' ##  Remove comments and serialize string
     printf "\"
-}"
+    }"
   )
   echo "$data"
 }
@@ -170,8 +170,6 @@ data_policies_only() {
 
 #################### workflow
 ## single executions
-## TODO: set key_shares to the # of /*.asc$/ found in dir
-## TODO: enable arg -t=POOP to allow customizing unseal threshold
 ## -n=key-shares
 ## -t=key-threshold (# of key shares required to unseal)
 init_vault() {
@@ -184,21 +182,22 @@ init_vault() {
     -pgp-keys="$JAIL/root.asc,$JAIL/admin_vault.asc" >$JAIL/root.unseal.json
 }
 
+get_single_unseal_token() {
+  echo $(
+    cat $JAIL/root.unseal.json |
+      jq -r ".unseal_keys_b64[$1]" |
+      base64 --decode |
+      gpg -dq
+  )
+}
 get_unseal_tokens() {
   echo -e "VAULT_TOKEN:\n\n$VAULT_TOKEN\n"
   echo -e "UNSEAL_TOKEN(s):\n"
   unseal_threshold=$(cat $JAIL/root.unseal.json | jq '.unseal_threshold')
   i=0
   while [ $i -lt $unseal_threshold ]; do
-    echo -e \
-      $(
-        cat $JAIL/root.unseal.json |
-          jq -r ".unseal_keys_b64[$i]" |
-          base64 --decode |
-          gpg -dq
-      )
+    echo -e "\n$(get_single_unseal_token $i)"
     i=$((i + 1))
-    echo
   done
 }
 
@@ -206,13 +205,7 @@ unseal_vault() {
   unseal_threshold=$(cat $JAIL/root.unseal.json | jq '.unseal_threshold')
   i=0
   while [ $i -lt $unseal_threshold ]; do
-    vault operator unseal \
-      $(
-        cat $JAIL/root.unseal.json |
-          jq -r ".unseal_keys_b64[$i]" |
-          base64 --decode |
-          gpg -dq
-      )
+    vault operator unseal $(get_single_unseal_token $i)
     i=$((i + 1))
   done
 }
