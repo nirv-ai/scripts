@@ -1,6 +1,0 @@
-{
-  "allowed_policies": ["default", "user_ops"],
-  "ttl": "24h",
-  "explicit_max_ttl": "7d",
-  "no_parent": true
-}
