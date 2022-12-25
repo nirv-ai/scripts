@@ -84,7 +84,8 @@ vault_curl() {
     echo -e "[url]: $1\n[args]: ${@:2}\n------------\n\n"
   fi
 
-  curl -v -H "Connection: close" --url $1 "${@:2}" | jq
+  # curl -v should not be used outside of DEV
+  curl -H "Connection: close" --url $1 "${@:2}" | jq
 }
 vault_curl_auth() {
   vault_curl $1 -H "$TOKEN_HEADER" "${@:2}"
@@ -169,6 +170,34 @@ data_policies_only() {
 
 #################### workflow
 ## single executions
+init_vault() {
+  echo -e 'this may take some time...'
+  vault operator init \
+    -format="json" \
+    -n=2 \
+    -t=2 \
+    -root-token-pgp-key="$JAIL/root.asc" \
+    -pgp-keys="$JAIL/root.asc,$JAIL/admin_vault.asc" >$JAIL/root.unseal.json
+}
+
+get_unseal_tokens() {
+  echo -e "VAULT_TOKEN:\n\n$VAULT_TOKEN\n"
+  echo -e "UNSEAL_TOKEN(s):\n"
+  unseal_threshold=$(cat $JAIL/root.unseal.json | jq '.unseal_threshold')
+  i=0
+  while [ $i -lt $unseal_threshold ]; do
+    echo -e \
+      $(
+        cat $JAIL/root.unseal.json |
+          jq -r ".unseal_keys_b64[$i]" |
+          base64 --decode |
+          gpg -dq
+      )
+    i=$((i + 1))
+    echo
+  done
+}
+
 unseal_vault() {
   unseal_threshold=$(cat $JAIL/root.unseal.json | jq '.unseal_threshold')
   i=0
@@ -210,6 +239,8 @@ process_policies_in_dir() {
 }
 
 case $1 in
+init) init_vault ;;
+get_unseal_tokens) get_unseal_tokens ;;
 unseal) unseal_vault ;;
 enable)
   case $2 in
