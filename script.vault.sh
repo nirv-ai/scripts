@@ -2,7 +2,7 @@
 
 # append `--output-policy` to see the policy needed to execute a cmd
 
-set -eu
+set -euo pipefail
 
 # interface
 ADDR="${VAULT_ADDR:?VAULT_ADDR not set: exiting}/v1"
@@ -48,6 +48,9 @@ invalid_request() {
   echo -e $INVALID_REQUEST_MSG
 }
 throw_if_file_doesnt_exist() {
+  # todo: if path starts with / return it
+  # todo: if path starts with . throw
+
   if test ! -f "$1"; then
     echo -e "file doesnt exist: $1"
     exit 1
@@ -55,12 +58,6 @@ throw_if_file_doesnt_exist() {
 }
 get_payload_path() {
   local path=${1:?'cant get unknown path: string not provided'}
-
-  throw_if_file_doesnt_exist $path
-
-  # todo: if path starts with / return it
-  # todo: if path starts with . throw
-  # todo: if path doesnt end with .json throw
 
   echo "$(pwd)/$path"
 }
@@ -258,6 +255,7 @@ create)
     syntax='syntax: create poly path/to/distinct_poly_name.hcl'
     payload="${3:?$syntax}"
     payload_path=$(get_payload_path $payload)
+    throw_if_file_doesnt_exist $payload_path
     payload_data=$(data_policy_only $payload_path)
     payload_filename=$(get_payload_filename $payload_path)
 
