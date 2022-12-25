@@ -1,7 +1,0 @@
-{
-  "policies": ["default", "reset_pw"],
-  "ttl": "15m",
-  "explicit_max_ttl": "7d",
-  "num_uses": 1,
-  "no_parent": true
-}

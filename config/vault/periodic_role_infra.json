@@ -1,5 +1,0 @@
-{
-  "allowed_policies": ["default", "infra"],
-  "period": "30d",
-  "no_parent": true
-}
