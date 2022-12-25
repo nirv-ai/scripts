@@ -170,6 +170,10 @@ data_policies_only() {
 
 #################### workflow
 ## single executions
+## TODO: set key_shares to the # of /*.asc$/ found in dir
+## TODO: enable arg -t=POOP to allow customizing unseal threshold
+## -n=key-shares
+## -t=key-threshold (# of key shares required to unseal)
 init_vault() {
   echo -e 'this may take some time...'
   vault operator init \
