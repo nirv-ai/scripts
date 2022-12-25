@@ -169,6 +169,20 @@ data_policies_only() {
 
 #################### workflow
 ## single executions
+unseal_vault() {
+  unseal_threshold=$(cat $JAIL/root.unseal.json | jq '.unseal_threshold')
+  i=0
+  while [ $i -lt $unseal_threshold ]; do
+    vault operator unseal \
+      $(
+        cat $JAIL/root.unseal.json |
+          jq -r ".unseal_keys_b64[$i]" |
+          base64 --decode |
+          gpg -dq
+      )
+    i=$((i + 1))
+  done
+}
 create_policy() {
   syntax='syntax: create_policy [/]path/to/distinct_poly_name.hcl'
   payload="${1:?$syntax}"
@@ -194,7 +208,9 @@ process_policies_in_dir() {
     esac
   done
 }
+
 case $1 in
+unseal) unseal_vault ;;
 enable)
   case $2 in
   secret | approle | database)
