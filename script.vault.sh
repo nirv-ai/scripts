@@ -192,7 +192,7 @@ list)
     vault_list "$ADDR/$SECRET_DATA/$3"
     ;;
   secret-engines)
-    vault_list "$ADDR/$SYS_MOUNTS"
+    vault_curl_auth "$ADDR/$SYS_MOUNTS"
     ;;
   approles)
     vault_list "$ADDR/$AUTH_APPROLE_ROLE"
