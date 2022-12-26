@@ -133,7 +133,7 @@ vault_put_data() {
   vault_curl_auth $2 -X PUT --data "$1"
 }
 vault_patch_data() {
-  vault_curl_auth $2 -X PATCH --data "$1"
+  vault_curl_auth $2 -X PATCH -H Content-Type application/merge-patch+json --data "$1"
 }
 
 #################### DATA
@@ -203,7 +203,7 @@ data_policy_only() {
 ## -n=key-shares
 ## -t=key-threshold (# of key shares required to unseal)
 init_vault() {
-  # TODO: we should NOT Be using the vault cli
+  # TODO: we should NOT Be using the vault cli for anything in this file
   echo -e 'this may take some time...'
   vault operator init \
     -format="json" \
@@ -297,31 +297,36 @@ process_engine_configs() {
   echo -e "\nchecking for engine configuration files in: $engine_config_dir_full_path"
 
   for file_starts_with_secret_ in $engine_config_dir_full_path; do
-    case $file_starts_with_secret_ in
-    *"/secret_kv2"*)
-      local engine_config_filename=$(get_file_name $file_starts_with_secret_)
+    local engine_config_filename=$(get_file_name $file_starts_with_secret_)
 
-      # configure shell to parse filename into expected components
-      PREV_IFS="$IFS"                # save prev boundary
-      IFS="."                        # enable.thisThing.atThisPath
-      set -f                         # stop wildcard * expansion
-      set -- $engine_config_filename # break filename @ '.' into positional args
+    # configure shell to parse filename into expected components
+    PREV_IFS="$IFS"                # save prev boundary
+    IFS="."                        # enable.thisThing.atThisPath
+    set -f                         # stop wildcard * expansion
+    set -- $engine_config_filename # break filename @ '.' into positional args
 
-      # reset shell back to normal
-      set +f
-      IFS=$PREV_IFS
+    # reset shell back to normal
+    set +f
+    IFS=$PREV_IFS
 
-      echo -e "\nkv2 engine\n[PATH]: $2\n[TYPE]: $3\n"
+    engine_type=${1:-''}
+    two=${2:-''}
+    three=${3:-''}
+    four=${4:-''}
+
+    case $engine_type in
+    secret_kv2)
+      echo -e "\nkv2 engine\n[PATH]: $two\n[TYPE]: $three\n"
 
       case $3 in
       config)
-        echo -e "creating config for kv2 engine enabled at path: $2"
-        vault_post_data "@${file_starts_with_secret_}" "$ADDR/$2/$3"
+        echo -e "creating config for kv2 engine enabled at path: $two"
+        vault_post_data "@${file_starts_with_secret_}" "$ADDR/$two/$three"
         ;;
       *) echo -e "ignoring unknown file format: $engine_config_filename" ;;
       esac
       ;;
-    *"/secret_database"*)
+    secret_database)
       echo -e "\nTODO: not ready for database config: $file_starts_with_secret_\n"
       ;;
     esac
