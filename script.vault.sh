@@ -179,7 +179,7 @@ data_policy_only() {
   echo "$data"
 }
 
-#################### workflow
+#################### single use fns
 ## single executions
 ## -n=key-shares
 ## -t=key-threshold (# of key shares required to unseal)
@@ -254,7 +254,7 @@ enable_something() {
   )
   vault_post_data $data "$ADDR/$URL"
 }
-## batch prcoesses
+################################ workflows
 process_policies_in_dir() {
   local policy_dir_full_path="$(pwd)/$1/*"
   echo -e "\nchecking for policies in: $policy_dir_full_path"
@@ -269,10 +269,8 @@ process_policies_in_dir() {
   done
 }
 enable_something_in_dir() {
-  # @see https://stackoverflow.com/questions/1469849/how-to-split-one-string-into-multiple-strings-separated-by-at-least-one-space-in
-
   local enable_something_full_dir="$(pwd)/$1/*"
-  echo -e "\nchecking for enable_XXX.engine.atpath files in:\n$enable_something_full_dir\n"
+  echo -e "\nchecking for enable_XXX.thisthing.atthispath files in:\n$enable_something_full_dir\n"
 
   for file_starts_with_enable_X in $enable_something_full_dir; do
     case $file_starts_with_enable_X in
@@ -280,18 +278,22 @@ enable_something_in_dir() {
       local auth_filename=$(get_file_name $file_starts_with_enable_X)
 
       # configure shell to parse filename into expected components
-      PREV_IFS="$IFS"       # save prev
+      PREV_IFS="$IFS"       # save prev boundary
       IFS="."               # enable_XXX.thisThing.atThisPath
       set -f                # stop wildcard * expansion
       set -- $auth_filename # break filename @ '.' into positional args
-      echo -e "\nparsed request:\n[ENGINE]: $2\n[@ PATH]: $3"
 
       # reset shell back to normal
       set +f
       IFS=$PREV_IFS
 
-      # make request
-      enable_something $2 $3
+      # make request if 2 and 3 are set, but 4 isnt
+      if test -n ${2:-} && test -n ${3:-''} && test -z ${4:-''}; then
+        enable_something $2 $3
+      else
+        echo -e "ignoring file\ndidnt match expectations: $auth_filename"
+        echo -e 'filename syntax: ^enable_THIS.THING.AT_PATH$\n'
+      fi
       ;;
     esac
   done
