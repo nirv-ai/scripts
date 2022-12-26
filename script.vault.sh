@@ -203,6 +203,7 @@ data_policy_only() {
 ## -n=key-shares
 ## -t=key-threshold (# of key shares required to unseal)
 init_vault() {
+  # TODO: we should NOT Be using the vault cli
   echo -e 'this may take some time...'
   vault operator init \
     -format="json" \
