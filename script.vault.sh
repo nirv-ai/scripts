@@ -291,6 +291,41 @@ process_policies_in_dir() {
     esac
   done
 }
+process_engine_configs() {
+  local engine_config_dir_full_path="$(pwd)/$1/*"
+  echo -e "\nchecking for engine configuration files in: $engine_config_dir_full_path"
+
+  for file_starts_with_secret_ in $engine_config_dir_full_path; do
+    case $file_starts_with_secret_ in
+    *"/secret_kv2"*)
+      local engine_config_filename=$(get_file_name $file_starts_with_secret_)
+
+      # configure shell to parse filename into expected components
+      PREV_IFS="$IFS"                # save prev boundary
+      IFS="."                        # enable.thisThing.atThisPath
+      set -f                         # stop wildcard * expansion
+      set -- $engine_config_filename # break filename @ '.' into positional args
+
+      # reset shell back to normal
+      set +f
+      IFS=$PREV_IFS
+
+      echo -e "\nkv2 engine\n[PATH]: $2\n[TYPE]: $3\n"
+
+      case $3 in
+      config)
+        echo -e "creating config for kv2 engine enabled at path: $2"
+        vault_post_data "@${file_starts_with_secret_}" "$ADDR/$2/$3"
+        ;;
+      *) echo -e "ignoring unknown file format: $engine_config_filename" ;;
+      esac
+      ;;
+    *"/secret_database"*)
+      echo -e "\nTODO: not ready for database config: $file_starts_with_secret_\n"
+      ;;
+    esac
+  done
+}
 process_token_role_in_dir() {
   local token_role_dir_full_path="$(pwd)/$1/*"
   echo -e "\nchecking for token roles in: $token_role_dir_full_path"
@@ -682,6 +717,11 @@ process)
     dir=${3:?'syntax: process enable_feature path/to/dir'}
     throw_if_dir_doesnt_exist $dir
     enable_something_in_dir $dir
+    ;;
+  engine_config)
+    dir=${3:?'syntax: process engine_config path/to/dir'}
+    throw_if_dir_doesnt_exist $dir
+    process_engine_configs $dir
     ;;
   *) invalid_request ;;
   esac
