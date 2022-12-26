@@ -270,16 +270,16 @@ process_policies_in_dir() {
 }
 enable_something_in_dir() {
   local enable_something_full_dir="$(pwd)/$1/*"
-  echo -e "\nchecking for enable_XXX.thisthing.atthispath files in:\n$enable_something_full_dir\n"
+  echo -e "\nchecking for enable.thisthing.atthispath files in:\n$enable_something_full_dir\n"
 
   for file_starts_with_enable_X in $enable_something_full_dir; do
     case $file_starts_with_enable_X in
-    *"/enable_auth"*)
+    *"/enable"*)
       local auth_filename=$(get_file_name $file_starts_with_enable_X)
 
       # configure shell to parse filename into expected components
       PREV_IFS="$IFS"       # save prev boundary
-      IFS="."               # enable_XXX.thisThing.atThisPath
+      IFS="."               # enable.thisThing.atThisPath
       set -f                # stop wildcard * expansion
       set -- $auth_filename # break filename @ '.' into positional args
 
@@ -292,7 +292,7 @@ enable_something_in_dir() {
         enable_something $2 $3
       else
         echo -e "ignoring file\ndidnt match expectations: $auth_filename"
-        echo -e 'filename syntax: ^enable_THIS.THING.AT_PATH$\n'
+        echo -e 'filename syntax: ^enable.THING.AT_PATH$\n'
       fi
       ;;
     esac
@@ -316,8 +316,8 @@ enable)
   ;;
 list)
   case $2 in
+  # @see https://github.com/hashicorp/vault/issues/1115 list only root tokens
   axors)
-    # @see https://github.com/hashicorp/vault/issues/1115 list only root tokens
     echo -e 'listing all tokens'
     vault_list $ADDR/$AUTH_TOKEN_ACCESSORS
     ;;
@@ -596,7 +596,7 @@ process)
     throw_if_dir_doesnt_exist $dir
     process_policies_in_dir $dir
     ;;
-  auths_in_dir)
+  enable_feature)
     dir=${3:?'syntax: process auths_in_dir path/to/dir'}
     throw_if_dir_doesnt_exist $dir
     enable_something_in_dir $dir
