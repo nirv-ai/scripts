@@ -268,6 +268,19 @@ process_policies_in_dir() {
     esac
   done
 }
+process_auths_in_dir() {
+  local auth_dir_full_path="$(pwd)/$1/*"
+  echo -e "\nchecking for auth configs in: $auth_dir_full_path"
+
+  for file_starts_with_auth_ in $auth_dir_full_path; do
+    case $file_starts_with_auth_ in
+    *"/auth_approle_role_"*)
+      echo -e "\nprocessing approle auth config:\n$file_starts_with_auth_\n"
+      create_approle $file_starts_with_auth_
+      ;;
+    esac
+  done
+}
 enable_something_in_dir() {
   local enable_something_full_dir="$(pwd)/$1/*"
   echo -e "\nchecking for enable.thisthing.atthispath files in:\n$enable_something_full_dir\n"
@@ -596,8 +609,13 @@ process)
     throw_if_dir_doesnt_exist $dir
     process_policies_in_dir $dir
     ;;
+  auth_in_dir)
+    dir=${3:?'syntax: process auth_in_dir path/to/dir'}
+    throw_if_dir_doesnt_exist $dir
+    process_auths_in_dir $dir
+    ;;
   enable_feature)
-    dir=${3:?'syntax: process auths_in_dir path/to/dir'}
+    dir=${3:?'syntax: process enable_feature path/to/dir'}
     throw_if_dir_doesnt_exist $dir
     enable_something_in_dir $dir
     ;;
