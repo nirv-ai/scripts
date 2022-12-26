@@ -70,13 +70,18 @@ get_payload_path() {
   *) echo "$(pwd)/$path" ;;
   esac
 }
-get_payload_filename() {
-  local full_path_with_ext=${1:?'cant get unknown path: string not provided'}
-  local file_with_ext="${full_path_with_ext##*/}"
-
-  echo "${file_with_ext%.*}" # file without extension
+get_file_name() {
+  local some_path=${1:?'cant get unknown path: string not provided'}
+  echo "${some_path##*/}"
 }
+get_filename_without_extension() {
+  local full_path_with_ext=${1:?'cant get unknown path: string not provided'}
+  local file_with_ext=$(get_file_name $full_path_with_ext)
 
+  # wont work if file.name.contains.periods
+  # will return the `file` in above example
+  echo "${file_with_ext%.*}"
+}
 ####################### REQUESTS
 vault_curl() {
   if [ "$DEBUG" = 1 ]; then
@@ -219,7 +224,7 @@ create_policy() {
   payload_path=$(get_payload_path $payload)
   throw_if_file_doesnt_exist $payload_path
   payload_data=$(data_policy_only $payload_path)
-  payload_filename=$(get_payload_filename $payload_path)
+  payload_filename=$(get_filename_without_extension $payload_path)
 
   echo -e "creating policy $payload_filename:\n$(cat $payload_path)"
   vault_post_data "$payload_data" $ADDR/$SYS_POLY_ACL/$payload_filename
@@ -229,7 +234,7 @@ create_approle() {
   payload="${1:?$syntax}"
   payload_path=$(get_payload_path $payload)
   throw_if_file_doesnt_exist $payload_path
-  payload_filename=$(get_payload_filename $payload_path)
+  payload_filename=$(get_filename_without_extension $payload_path)
 
   echo -e "creating approle $payload_filename:\n$(cat $payload_path)"
   vault_post_data "@$payload_path" "$ADDR/$AUTH_APPROLE_ROLE/$payload_filename"
@@ -263,19 +268,20 @@ process_policies_in_dir() {
     esac
   done
 }
-process_enable_auth_schemes_in_dir() {
-  local enable_something_in_dir="$(pwd)/$1/*"
-  echo -e "\nchecking for enable_XXX.thing.atpath files in: $enable_something_in_dir"
+enable_something_in_dir() {
+  local enable_something_full_dir="$(pwd)/$1/*"
+  echo -e "\nchecking for enable_XXX.engine.atpath files in: $enable_something_full_dir"
 
-  for file_starts_with_enable_X in $enable_something_in_dir; do
+  for file_starts_with_enable_X in $enable_something_full_dir; do
     case $file_starts_with_enable_X in
     *"/enable_auth"*)
-      echo -e "\nenabling auth_scheme: $file_starts_with_enable_X\n"
       # split filename on `.`
+      auth_filename=$(get_file_name $file_starts_with_enable_X)
       ## /enable_auth.authType.atThisPath
       ### kv-v2.secret
       ### approle.approle
       ### database.database
+      echo -e "\nenabling auth engine:\n[FILE]: $auth_filename\n"
       # create_policy $file_starts_with_policy_
       ;;
     esac
@@ -579,10 +585,10 @@ process)
     throw_if_dir_doesnt_exist $dir
     process_policies_in_dir $dir
     ;;
-  enable_auth_schemes)
-    dir=${3:?'syntax: process enable_auth_schemes path/to/dir'}
+  auths_in_dir)
+    dir=${3:?'syntax: process auths_in_dir path/to/dir'}
     throw_if_dir_doesnt_exist $dir
-    process_policies_in_dir $dir
+    enable_something_in_dir $dir
     ;;
   *) invalid_request ;;
   esac
