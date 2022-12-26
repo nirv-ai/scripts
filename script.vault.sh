@@ -431,7 +431,7 @@ get)
     # eg get status
     vault_curl "$ADDR/$SYS_HEALTH"
     ;;
-  creds)
+  approle-creds)
     # eg get creds roleId secretId
     data=$(data_login $3 $4)
     echo -e "getting creds for $3 with $data"
