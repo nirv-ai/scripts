@@ -21,7 +21,7 @@ DB=database
 DB_CONFIG=$DB/config                  # LIST this, DELETE this/:name, POST this/:name {connection}
 DB_CREDS=$DB/creds                    # GET this/:name
 DB_RESET=$DB/reset                    # POST this/:name,
-DB_ROLE=$DB/roles                     # LIST this, [GET|DELETE] this/:name, POST this/:name {config},
+DB_ROLES=$DB/roles                    # LIST this, [GET|DELETE] this/:name, POST this/:name {config},
 DB_ROTATE=$DB/rotate-root             # POST this/:name ,
 DB_STATIC_ROLE=$DB/static-roles       # LIST this, [GET|DELETE] this/:name, POST this/:name {config}
 DB_STATIC_CREDS=$DB/static-creds      # GET this/:name,
@@ -332,10 +332,13 @@ process_engine_configs() {
       case $three in
       config)
         echo -e "creating config for db: $two\n"
+        vault_post_data "@${file_starts_with_secret_}" "$ADDR/$DB_CONFIG/$two"
+        vault_post_no_data "$ADDR/$DB_ROTATE/$two"
         ;;
 
       role)
         echo -e "creating role ${four} for db ${two}\n"
+        vault_post_data "@${file_starts_with_secret_}" "$ADDR/$DB_ROLES/$four"
         ;;
       *) echo -e "ignoring file with unknown format: $engine_config_filename" ;;
       esac
