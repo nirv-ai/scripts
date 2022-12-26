@@ -17,6 +17,15 @@ AUTH_APPROLE=auth/approle
 AUTH_APPROLE_ROLE=$AUTH_APPROLE/role
 AUTH_TOKEN=auth/token
 AUTH_TOKEN_ACCESSORS=$AUTH_TOKEN/accessors
+DB=database
+DB_CONFIG=$DB/config             # LIST this, DELETE this/:name, POST this/:name {connection}
+DB_CREDS=$DB/creds               # GET this/:name
+DB_RESET=$DB/reset               # POST this/:name,
+DB_ROLE=$DB/roles                # LIST this, GET this/:name, DELETE this/:name, POST this/:name {config},
+DB_ROTATE=$DB/rotate-root        # POST this/:name ,
+DB_STATIC_ROLE=$DB/static-roles  # LIST this, GET this/:name, DELETE this/:name, POST this/:name {config}
+DB_STATIC_CREDS=$DB/static-creds # GET this/:name,
+DB_STATIC_ROTATE=$DB/rotate-role # POST this/:name,
 TOKEN_CREATE_CHILD=$AUTH_TOKEN/create
 TOKEN_CREATE_ORPHAN=$AUTH_TOKEN/create-orphan
 TOKEN_INFO=$AUTH_TOKEN/lookup
@@ -39,7 +48,6 @@ SYS_LEASES_LOOKUP=$SYS_LEASES/lookup
 SYS_LEASES_LOOKUP_DB_CREDS=$SYS_LEASES_LOOKUP/database/creds
 SYS_POLY=sys/policies
 SYS_POLY_ACL=$SYS_POLY/acl # -X PUT this/policyName
-DB_CREDS=database/creds
 
 ######################## ERROR HANDLING
 invalid_request() {
