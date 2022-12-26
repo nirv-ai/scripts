@@ -239,13 +239,13 @@ create_approle() {
   echo -e "creating approle $payload_filename:\n$(cat $payload_path)"
   vault_post_data "@$payload_path" "$ADDR/$AUTH_APPROLE_ROLE/$payload_filename"
 }
-enable_secret_engine() {
-  # syntax: enable_secret_engine thisEngine atThisPath
-  # eg enable_secret_engine kv-v2 secret
-  # eg enable_secret_engine approle approle
-  # eg enable_secret_engine database database
+enable_something() {
+  # syntax: enable_something thisThing atThisPath
+  # eg enable_something kv-v2 secret
+  # eg enable_something approle approle
+  # eg enable_something database database
   data=$(data_type_only $1)
-  echo -e "enabling secret engine: $2 of $data"
+  echo -e "enabling vault feature: $data at path $2"
 
   URL=$(
     [[ "$2" == secret || "$2" == database ]] &&
@@ -269,20 +269,29 @@ process_policies_in_dir() {
   done
 }
 enable_something_in_dir() {
+  # @see https://stackoverflow.com/questions/1469849/how-to-split-one-string-into-multiple-strings-separated-by-at-least-one-space-in
+
   local enable_something_full_dir="$(pwd)/$1/*"
-  echo -e "\nchecking for enable_XXX.engine.atpath files in: $enable_something_full_dir"
+  echo -e "\nchecking for enable_XXX.engine.atpath files in:\n$enable_something_full_dir\n"
 
   for file_starts_with_enable_X in $enable_something_full_dir; do
     case $file_starts_with_enable_X in
     *"/enable_auth"*)
-      # split filename on `.`
-      auth_filename=$(get_file_name $file_starts_with_enable_X)
-      ## /enable_auth.authType.atThisPath
-      ### kv-v2.secret
-      ### approle.approle
-      ### database.database
-      echo -e "\nenabling auth engine:\n[FILE]: $auth_filename\n"
-      # create_policy $file_starts_with_policy_
+      local auth_filename=$(get_file_name $file_starts_with_enable_X)
+
+      # configure shell to parse filename into expected components
+      PREV_IFS="$IFS"       # save prev
+      IFS="."               # enable_XXX.thisThing.atThisPath
+      set -f                # stop wildcard * expansion
+      set -- $auth_filename # break filename @ '.' into positional args
+      echo -e "\nparsed request:\n[ENGINE]: $2\n[@ PATH]: $3"
+
+      # reset shell back to normal
+      set +f
+      IFS=$PREV_IFS
+
+      # make request
+      enable_something $2 $3
       ;;
     esac
   done
@@ -298,7 +307,7 @@ enable)
     syntax='syntax: enable thisEngine atThisPath'
     engine=${2:?$syntax}
     atpath=${3:?$syntax}
-    enable_secret_engine $engine $atpath
+    enable_something $engine $atpath
     ;;
   *) invalid_request ;;
   esac
