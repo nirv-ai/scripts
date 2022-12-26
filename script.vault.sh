@@ -187,7 +187,6 @@ init_vault() {
     -root-token-pgp-key="$JAIL/root.asc" \
     -pgp-keys="$JAIL/root.asc,$JAIL/admin_vault.asc" >$JAIL/root.unseal.json
 }
-
 get_single_unseal_token() {
   echo $(
     cat $JAIL/root.unseal.json |
@@ -206,7 +205,6 @@ get_unseal_tokens() {
     i=$((i + 1))
   done
 }
-
 unseal_vault() {
   unseal_threshold=$(cat $JAIL/root.unseal.json | jq '.unseal_threshold')
   i=0
@@ -236,9 +234,24 @@ create_approle() {
   echo -e "creating approle $payload_filename:\n$(cat $payload_path)"
   vault_post_data "@$payload_path" "$ADDR/$AUTH_APPROLE_ROLE/$payload_filename"
 }
+enable_secret_engine() {
+  # syntax: enable_secret_engine thisEngine atThisPath
+  # eg enable_secret_engine kv-v2 secret
+  # eg enable_secret_engine approle approle
+  # eg enable_secret_engine database database
+  data=$(data_type_only $1)
+  echo -e "enabling secret engine: $2 of $data"
+
+  URL=$(
+    [[ "$2" == secret || "$2" == database ]] &&
+      echo "$SYS_MOUNTS/$2" ||
+      echo "$SYS_AUTH/$2"
+  )
+  vault_post_data $data "$ADDR/$URL"
+}
 ## batch prcoesses
 process_policies_in_dir() {
-  policy_dir_full_path="$(pwd)/$1/*"
+  local policy_dir_full_path="$(pwd)/$1/*"
   echo -e "\nchecking for policies in: $policy_dir_full_path"
 
   for file_starts_with_policy_ in $policy_dir_full_path; do
@@ -250,6 +263,24 @@ process_policies_in_dir() {
     esac
   done
 }
+process_enable_auth_schemes_in_dir() {
+  local enable_something_in_dir="$(pwd)/$1/*"
+  echo -e "\nchecking for enable_XXX.thing.atpath files in: $enable_something_in_dir"
+
+  for file_starts_with_enable_X in $enable_something_in_dir; do
+    case $file_starts_with_enable_X in
+    *"/enable_auth"*)
+      echo -e "\nenabling auth_scheme: $file_starts_with_enable_X\n"
+      # split filename on `.`
+      ## /enable_auth.authType.atThisPath
+      ### kv-v2.secret
+      ### approle.approle
+      ### database.database
+      # create_policy $file_starts_with_policy_
+      ;;
+    esac
+  done
+}
 
 case $1 in
 init) init_vault ;;
@@ -257,19 +288,11 @@ get_unseal_tokens) get_unseal_tokens ;;
 unseal) unseal_vault ;;
 enable)
   case $2 in
-  secret | approle | database)
-    # eg enable secret kv-v2
-    # eg enable approle approle
-    # eg enable database database
-    data=$(data_type_only $3)
-    echo -e "enabling secret engine: $2 of $data"
-
-    URL=$(
-      [[ "$2" == secret || "$2" == database ]] &&
-        echo "$SYS_MOUNTS/$2" ||
-        echo "$SYS_AUTH/$2"
-    )
-    vault_post_data $data "$ADDR/$URL"
+  kv-v2 | approle | database)
+    syntax='syntax: enable thisEngine atThisPath'
+    engine=${2:?$syntax}
+    atpath=${3:?$syntax}
+    enable_secret_engine $engine $atpath
     ;;
   *) invalid_request ;;
   esac
@@ -552,7 +575,12 @@ process)
 
   case $processwhat in
   policy_in_dir)
-    dir=${3:?'syntax: process policy_in_dir /full/path/to/dir'}
+    dir=${3:?'syntax: process policy_in_dir path/to/dir'}
+    throw_if_dir_doesnt_exist $dir
+    process_policies_in_dir $dir
+    ;;
+  enable_auth_schemes)
+    dir=${3:?'syntax: process enable_auth_schemes path/to/dir'}
     throw_if_dir_doesnt_exist $dir
     process_policies_in_dir $dir
     ;;
