@@ -328,8 +328,20 @@ process_engine_configs() {
       ;;
     secret_database)
       echo -e "\n$engine_type\n[NAME]: $two\n[CONFIG_TYPE]: $three\n"
+
+      case $three in
+      config)
+        echo -e "creating config for db: $two\n"
+        ;;
+
+      role)
+        echo -e "creating role ${four} for db ${two}\n"
+        ;;
+      *) echo -e "ignoring file with unknown format: $engine_config_filename" ;;
+      esac
       # echo -e "\nTODO: not ready for database config: $file_starts_with_secret_\n"
       ;;
+    *) echo -e "ignoring file with unknown format: $engine_config_filename" ;;
     esac
   done
 }
