@@ -18,15 +18,16 @@ AUTH_APPROLE_ROLE=$AUTH_APPROLE/role
 AUTH_TOKEN=auth/token
 AUTH_TOKEN_ACCESSORS=$AUTH_TOKEN/accessors
 DB=database
-DB_CONFIG=$DB/config             # LIST this, DELETE this/:name, POST this/:name {connection}
-DB_CREDS=$DB/creds               # GET this/:name
-DB_RESET=$DB/reset               # POST this/:name,
-DB_ROLE=$DB/roles                # LIST this, GET this/:name, DELETE this/:name, POST this/:name {config},
-DB_ROTATE=$DB/rotate-root        # POST this/:name ,
-DB_STATIC_ROLE=$DB/static-roles  # LIST this, GET this/:name, DELETE this/:name, POST this/:name {config}
-DB_STATIC_CREDS=$DB/static-creds # GET this/:name,
-DB_STATIC_ROTATE=$DB/rotate-role # POST this/:name,
-TOKEN_CREATE_CHILD=$AUTH_TOKEN/create
+DB_CONFIG=$DB/config                  # LIST this, DELETE this/:name, POST this/:name {connection}
+DB_CREDS=$DB/creds                    # GET this/:name
+DB_RESET=$DB/reset                    # POST this/:name,
+DB_ROLE=$DB/roles                     # LIST this, [GET|DELETE] this/:name, POST this/:name {config},
+DB_ROTATE=$DB/rotate-root             # POST this/:name ,
+DB_STATIC_ROLE=$DB/static-roles       # LIST this, [GET|DELETE] this/:name, POST this/:name {config}
+DB_STATIC_CREDS=$DB/static-creds      # GET this/:name,
+DB_STATIC_ROTATE=$DB/rotate-role      # POST this/:name,
+TOKEN_CREATE_CHILD=$AUTH_TOKEN/create # POST this/:rolename, POST this {config}
+TOKEN_CREATE_ROLE=$AUTH_TOKEN/roles   # POST this/:rolename {config}
 TOKEN_CREATE_ORPHAN=$AUTH_TOKEN/create-orphan
 TOKEN_INFO=$AUTH_TOKEN/lookup
 TOKEN_INFO_ACCESSOR=$AUTH_TOKEN/lookup-accessor
@@ -37,9 +38,19 @@ TOKEN_RENEW_AXOR=$AUTH_TOKEN/renew-accessor
 TOKEN_REVOKE_ID=$AUTH_TOKEN/revoke
 TOKEN_REVOKE_SELF=$AUTH_TOKEN/revoke-self
 TOKEN_REVOKE_AXOR=$AUTH_TOKEN/revoke-accessor
-TOKEN_REVOKE_PARENT=$AUTH_TOKEN/revoke-orphan #children become orphans, parent secrets revoked
-TOKEN_ROLES=$AUTH_TOKEN/roles                 # this/roleId [-X [DELETE | POST]] | this -X LIST
-SECRET_DATA=secret/data
+TOKEN_REVOKE_PARENT=$AUTH_TOKEN/revoke-orphan # children become orphans, parent secrets revoked
+TOKEN_ROLES=$AUTH_TOKEN/roles                 # LIST this, [DELETE|POST] this/:roleId
+# the default kv1 engine is mounted at env
+SECRET_KV1=env # [GET|LIST] this/:path, POST this/:path {json}
+# the default kv2 secret is mounted at secret
+SECRET_KV2=secret
+SECRET_KV2_DATA=$SECRET_KV2/data        # GET this/:path?version=X, PATCH this/:path {json} -H Content-Type application/merge-patch+json, DELETE this/:path
+SECRET_KV2_RM=$SECRET_KV2/delete        # POST this/:path {json}
+SECRET_KV2_RM_UNDO=$SECRET_KV2/undelete # POST this/:path {json}
+SECRET_KV2_ERASE=$SECRET_KV2/destroy    # POST this:path {json}
+SECRET_KV2_CONFIG=$SECRET_KV2/config    # GET this, POST this {config}
+SECRET_KV2_SUBKEYS=$SECRET_KV2/subkeys  # GET this/:path?version=X&depth=Y
+SECRET_KV2_KEYS=$SECRET_KV2/metadata    # [GET|LIST|DELETE] this/:path, POST this/:path {json}, PATCH this/:path {json} -H Content-Type application/merge-patch+json,
 SYS_AUTH=sys/auth
 SYS_HEALTH=sys/health
 SYS_MOUNTS=sys/mounts
@@ -47,7 +58,7 @@ SYS_LEASES=sys/leases
 SYS_LEASES_LOOKUP=$SYS_LEASES/lookup
 SYS_LEASES_LOOKUP_DB_CREDS=$SYS_LEASES_LOOKUP/database/creds
 SYS_POLY=sys/policies
-SYS_POLY_ACL=$SYS_POLY/acl # -X PUT this/policyName
+SYS_POLY_ACL=$SYS_POLY/acl # PUT this/:polyName
 
 ######################## ERROR HANDLING
 invalid_request() {
@@ -253,13 +264,17 @@ enable_something() {
   # eg enable_something approle approle
   # eg enable_something database database
   data=$(data_type_only $1)
-  echo -e "enabling vault feature: $data at path $2"
+  echo -e "\n\nenabling vault feature: $data at path $2"
 
-  URL=$(
-    [[ "$2" == secret || "$2" == database ]] &&
-      echo "$SYS_MOUNTS/$2" ||
-      echo "$SYS_AUTH/$2"
-  )
+  case $1 in
+  kv-v1 | kv-v2 | database)
+    URL="$SYS_MOUNTS/$2"
+    ;;
+  approle)
+    URL="$SYS_AUTH/$2"
+    ;;
+  *) invalid_request ;;
+  esac
   vault_post_data $data "$ADDR/$URL"
 }
 ################################ workflows
@@ -272,6 +287,36 @@ process_policies_in_dir() {
     *"/policy_"*)
       echo -e "\nprocessing policy: $file_starts_with_policy_\n"
       create_policy $file_starts_with_policy_
+      ;;
+    esac
+  done
+}
+process_token_role_in_dir() {
+  local token_role_dir_full_path="$(pwd)/$1/*"
+  echo -e "\nchecking for token roles in: $token_role_dir_full_path"
+
+  for file_starts_with_token_role in $token_role_dir_full_path; do
+    case $file_starts_with_token_role in
+    *"/token_role"*)
+      local token_role_filename=$(get_file_name $file_starts_with_token_role)
+
+      # configure shell to parse filename into expected components
+      PREV_IFS="$IFS"             # save prev boundary
+      IFS="."                     # enable.thisThing.atThisPath
+      set -f                      # stop wildcard * expansion
+      set -- $token_role_filename # break filename @ '.' into positional args
+
+      # reset shell back to normal
+      set +f
+      IFS=$PREV_IFS
+
+      # make request if 2 is set, but 3 isnt
+      if test -n ${2:-''} && test -n ${3:-''} && test -z ${4:-''}; then
+        vault_post_data "@${file_starts_with_token_role}" "$ADDR/$TOKEN_CREATE_ROLE/${2}"
+      else
+        echo -e "ignoring file\ndidnt match expectations: $token_role_filename"
+        echo -e 'filename syntax: ^token_role.ROLE_NAME$\n'
+      fi
       ;;
     esac
   done
@@ -326,7 +371,7 @@ get_unseal_tokens) get_unseal_tokens ;;
 unseal) unseal_vault ;;
 enable)
   case $2 in
-  kv-v2 | approle | database)
+  kv-v2 | kv-v1 | approle | database)
     syntax='syntax: enable thisEngine atThisPath'
     engine=${2:?$syntax}
     atpath=${3:?$syntax}
@@ -399,6 +444,12 @@ create)
     tokentype=${3:-''}
 
     case $tokentype in
+    for-role)
+      rolename="${4:?'syntax: create token for-role roleName'}"
+
+      echo -e "creating token for role: $rolename"
+      vault_post_no_data $ADDR/$TOKEN_CREATE_CHILD/$rolename
+      ;;
     child)
       payload="${4:?$syntax}"
       payload_path=$(get_payload_path $payload)
@@ -616,6 +667,11 @@ process)
     dir=${3:?'syntax: process policy_in_dir path/to/dir'}
     throw_if_dir_doesnt_exist $dir
     process_policies_in_dir $dir
+    ;;
+  token_role_in_dir)
+    dir=${3:?'syntax: process token_in_dir path/to/dir'}
+    throw_if_dir_doesnt_exist $dir
+    process_token_role_in_dir $dir
     ;;
   auth_in_dir)
     dir=${3:?'syntax: process auth_in_dir path/to/dir'}
