@@ -301,7 +301,7 @@ process_engine_configs() {
 
     # configure shell to parse filename into expected components
     PREV_IFS="$IFS"                # save prev boundary
-    IFS="."                        # enable.thisThing.atThisPath
+    IFS="."                        # secret_TYPE.TWO.THREE.FOUR.json
     set -f                         # stop wildcard * expansion
     set -- $engine_config_filename # break filename @ '.' into positional args
 
@@ -316,18 +316,19 @@ process_engine_configs() {
 
     case $engine_type in
     secret_kv2)
-      echo -e "\nkv2 engine\n[PATH]: $two\n[TYPE]: $three\n"
+      echo -e "\n$engine_type\n[PATH]: $two\n[TYPE]: $three\n"
 
       case $3 in
       config)
-        echo -e "creating config for kv2 engine enabled at path: $two"
+        echo -e "creating config for $engine_type enabled at path: $two"
         vault_post_data "@${file_starts_with_secret_}" "$ADDR/$two/$three"
         ;;
       *) echo -e "ignoring unknown file format: $engine_config_filename" ;;
       esac
       ;;
     secret_database)
-      echo -e "\nTODO: not ready for database config: $file_starts_with_secret_\n"
+      echo -e "\n$engine_type\n[NAME]: $two\n[CONFIG_TYPE]: $three\n"
+      # echo -e "\nTODO: not ready for database config: $file_starts_with_secret_\n"
       ;;
     esac
   done
