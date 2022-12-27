@@ -73,8 +73,8 @@ core*)
   docker compose down
   docker stop $(docker ps -a -q) || true
   docker rm $(docker ps -a -q) || true
-  docker system prune -a
-  # docker rmi $(docker images -a -q) || true
+  docker system prune -a || true
+  docker volume prune || true
   create_volumes
   build
   up

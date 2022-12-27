@@ -60,24 +60,33 @@ SYS_LEASES_LOOKUP_DB_CREDS=$SYS_LEASES_LOOKUP/database/creds
 SYS_POLY=sys/policies
 SYS_POLY_ACL=$SYS_POLY/acl # PUT this/:polyName
 
+######################## DEBUG ECHO
+echo_debug() {
+  if [ "$DEBUG" = 1 ]; then
+    echo -e '\n\n[DEBUG] SCRIPT.VAULT.SH\n------------'
+    echo -e "$@"
+    echo '\n------------\n\n'
+  fi
+}
+
 ######################## ERROR HANDLING
 invalid_request() {
   local INVALID_REQUEST_MSG="invalid request: @see https://github.com/nirv-ai/docs/blob/main/vault/README.md"
 
-  echo -e $INVALID_REQUEST_MSG
+  echo_debug $INVALID_REQUEST_MSG
 }
 throw_if_file_doesnt_exist() {
   # todo: if path starts with / return it
   # todo: if path starts with . throw
 
   if test ! -f "$1"; then
-    echo -e "file doesnt exist: $1"
+    echo_debug "file doesnt exist: $1"
     exit 1
   fi
 }
 throw_if_dir_doesnt_exist() {
   if test ! -d "$1"; then
-    echo -e "directory doesnt exist: $1"
+    echo_debug "directory doesnt exist: $1"
     exit 1
   fi
 }
@@ -103,10 +112,7 @@ get_filename_without_extension() {
 }
 ####################### REQUESTS
 vault_curl() {
-  if [ "$DEBUG" = 1 ]; then
-    echo -e '\n\n[DEBUG] SCRIPT.VAULT.SH\n------------'
-    echo -e "[url]: $1\n[args]: ${@:2}\n------------\n\n"
-  fi
+  echo_debug "[url]: $1\n[args]: ${@:2}\n------------\n\n"
 
   # curl -v should not be used outside of DEV
   curl -H "Connection: close" --url $1 "${@:2}" | jq
@@ -204,7 +210,7 @@ data_policy_only() {
 ## -t=key-threshold (# of key shares required to unseal)
 init_vault() {
   # TODO: we should NOT Be using the vault cli for anything in this file
-  echo -e 'this may take some time...'
+  echo_debug 'this may take some time...'
   vault operator init \
     -format="json" \
     -n=2 \
@@ -221,12 +227,12 @@ get_single_unseal_token() {
   )
 }
 get_unseal_tokens() {
-  echo -e "VAULT_TOKEN:\n\n$VAULT_TOKEN\n"
-  echo -e "UNSEAL_TOKEN(s):\n"
+  echo_debug "VAULT_TOKEN:\n\n$VAULT_TOKEN\n"
+  echo_debug "UNSEAL_TOKEN(s):\n"
   unseal_threshold=$(cat $JAIL/root.unseal.json | jq '.unseal_threshold')
   i=0
   while [ $i -lt $unseal_threshold ]; do
-    echo -e "\n$(get_single_unseal_token $i)"
+    echo_debug "\n$(get_single_unseal_token $i)"
     i=$((i + 1))
   done
 }
@@ -246,7 +252,7 @@ create_policy() {
   payload_data=$(data_policy_only $payload_path)
   payload_filename=$(get_filename_without_extension $payload_path)
 
-  echo -e "creating policy $payload_filename:\n$(cat $payload_path)"
+  echo_debug "creating policy $payload_filename:\n$(cat $payload_path)"
   vault_post_data "$payload_data" $ADDR/$SYS_POLY_ACL/$payload_filename
 }
 create_approle() {
@@ -256,7 +262,7 @@ create_approle() {
   throw_if_file_doesnt_exist $payload_path
   payload_filename=$(get_filename_without_extension $payload_path)
 
-  echo -e "creating approle $payload_filename:\n$(cat $payload_path)"
+  echo_debug "creating approle $payload_filename:\n$(cat $payload_path)"
   vault_post_data "@$payload_path" "$ADDR/$AUTH_APPROLE_ROLE/$payload_filename"
 }
 enable_something() {
@@ -265,7 +271,7 @@ enable_something() {
   # eg enable_something approle approle
   # eg enable_something database database
   data=$(data_type_only $1)
-  echo -e "\n\nenabling vault feature: $data at path $2"
+  echo_debug "\n\nenabling vault feature: $data at path $2"
 
   case $1 in
   kv-v1 | kv-v2 | database)
@@ -281,12 +287,12 @@ enable_something() {
 ################################ workflows
 process_policies_in_dir() {
   local policy_dir_full_path="$(pwd)/$1/*"
-  echo -e "\nchecking for policies in: $policy_dir_full_path"
+  echo_debug "\nchecking for policies in: $policy_dir_full_path"
 
   for file_starts_with_policy_ in $policy_dir_full_path; do
     case $file_starts_with_policy_ in
     *"/policy_"*)
-      echo -e "\nprocessing policy: $file_starts_with_policy_\n"
+      echo_debug "\nprocessing policy: $file_starts_with_policy_\n"
       create_policy $file_starts_with_policy_
       ;;
     esac
@@ -294,7 +300,7 @@ process_policies_in_dir() {
 }
 process_engine_configs() {
   local engine_config_dir_full_path="$(pwd)/$1/*"
-  echo -e "\nchecking for engine configuration files in: $engine_config_dir_full_path"
+  echo_debug "\nchecking for engine configuration files in: $engine_config_dir_full_path"
 
   for file_starts_with_secret_ in $engine_config_dir_full_path; do
     local engine_config_filename=$(get_file_name $file_starts_with_secret_)
@@ -316,41 +322,41 @@ process_engine_configs() {
 
     case $engine_type in
     secret_kv2)
-      echo -e "\n$engine_type\n[PATH]: $two\n[TYPE]: $three\n"
+      echo_debug "\n$engine_type\n[PATH]: $two\n[TYPE]: $three\n"
 
       case $3 in
       config)
-        echo -e "creating config for $engine_type enabled at path: $two"
+        echo_debug "creating config for $engine_type enabled at path: $two"
         vault_post_data "@${file_starts_with_secret_}" "$ADDR/$two/$three"
         ;;
-      *) echo -e "ignoring unknown file format: $engine_config_filename" ;;
+      *) echo_debug "ignoring unknown file format: $engine_config_filename" ;;
       esac
       ;;
     secret_database)
-      echo -e "\n$engine_type\n[NAME]: $two\n[CONFIG_TYPE]: $three\n"
+      echo_debug "\n$engine_type\n[NAME]: $two\n[CONFIG_TYPE]: $three\n"
 
       case $three in
       config)
-        echo -e "creating config for db: $two\n"
+        echo_debug "creating config for db: $two\n"
         vault_post_data "@${file_starts_with_secret_}" "$ADDR/$DB_CONFIG/$two"
         vault_post_no_data "$ADDR/$DB_ROTATE/$two"
         ;;
 
       role)
-        echo -e "creating role ${four} for db ${two}\n"
+        echo_debug "creating role ${four} for db ${two}\n"
         vault_post_data "@${file_starts_with_secret_}" "$ADDR/$DB_ROLES/$four"
         ;;
-      *) echo -e "ignoring file with unknown format: $engine_config_filename" ;;
+      *) echo_debug "ignoring file with unknown format: $engine_config_filename" ;;
       esac
-      # echo -e "\nTODO: not ready for database config: $file_starts_with_secret_\n"
+      # echo_debug "\nTODO: not ready for database config: $file_starts_with_secret_\n"
       ;;
-    *) echo -e "ignoring file with unknown format: $engine_config_filename" ;;
+    *) echo_debug "ignoring file with unknown format: $engine_config_filename" ;;
     esac
   done
 }
 process_token_role_in_dir() {
   local token_role_dir_full_path="$(pwd)/$1/*"
-  echo -e "\nchecking for token roles in: $token_role_dir_full_path"
+  echo_debug "\nchecking for token roles in: $token_role_dir_full_path"
 
   for file_starts_with_token_role in $token_role_dir_full_path; do
     case $file_starts_with_token_role in
@@ -371,8 +377,8 @@ process_token_role_in_dir() {
       if test -n ${2:-''} && test -n ${3:-''} && test -z ${4:-''}; then
         vault_post_data "@${file_starts_with_token_role}" "$ADDR/$TOKEN_CREATE_ROLE/${2}"
       else
-        echo -e "ignoring file\ndidnt match expectations: $token_role_filename"
-        echo -e 'filename syntax: ^token_role.ROLE_NAME$\n'
+        echo_debug "ignoring file\ndidnt match expectations: $token_role_filename"
+        echo_debug 'filename syntax: ^token_role.ROLE_NAME$\n'
       fi
       ;;
     esac
@@ -380,12 +386,12 @@ process_token_role_in_dir() {
 }
 process_auths_in_dir() {
   local auth_dir_full_path="$(pwd)/$1/*"
-  echo -e "\nchecking for auth configs in: $auth_dir_full_path"
+  echo_debug "\nchecking for auth configs in: $auth_dir_full_path"
 
   for file_starts_with_auth_ in $auth_dir_full_path; do
     case $file_starts_with_auth_ in
     *"/auth_approle_role_"*)
-      echo -e "\nprocessing approle auth config:\n$file_starts_with_auth_\n"
+      echo_debug "\nprocessing approle auth config:\n$file_starts_with_auth_\n"
       create_approle $file_starts_with_auth_
       ;;
     esac
@@ -393,7 +399,7 @@ process_auths_in_dir() {
 }
 enable_something_in_dir() {
   local enable_something_full_dir="$(pwd)/$1/*"
-  echo -e "\nchecking for enable.thisthing.atthispath files in:\n$enable_something_full_dir\n"
+  echo_debug "\nchecking for enable.thisthing.atthispath files in:\n$enable_something_full_dir\n"
 
   for file_starts_with_enable_X in $enable_something_full_dir; do
     case $file_starts_with_enable_X in
@@ -414,8 +420,8 @@ enable_something_in_dir() {
       if test -n ${2:-} && test -n ${3:-''} && test -z ${4:-''}; then
         enable_something $2 $3
       else
-        echo -e "ignoring file\ndidnt match expectations: $auth_filename"
-        echo -e 'filename syntax: ^enable.THING.AT_PATH$\n'
+        echo_debug "ignoring file\ndidnt match expectations: $auth_filename"
+        echo_debug 'filename syntax: ^enable.THING.AT_PATH$\n'
       fi
       ;;
     esac
@@ -441,7 +447,7 @@ list)
   case $2 in
   # @see https://github.com/hashicorp/vault/issues/1115 list only root tokens
   axors)
-    echo -e 'listing all tokens'
+    echo_debug 'listing all tokens'
     vault_list $ADDR/$AUTH_TOKEN_ACCESSORS
     ;;
   secrets)
@@ -460,7 +466,7 @@ list)
     case $3 in
     leases)
       # eg list postgres leases bff
-      echo -e "listing provisioned leases for postgres role $4"
+      echo_debug "listing provisioned leases for postgres role $4"
 
       vault_list "$ADDR/$SYS_LEASES_LOOKUP_DB_CREDS/$4"
       ;;
@@ -477,7 +483,7 @@ create)
     kv2)
       # eg create secret kv2 poo/in/ur/eye '{"a": "b", "c": "d"}'
       data="{\"data\": $5 }"
-      echo -e "creating secret at $4 with $data"
+      echo_debug "creating secret at $4 with $data"
 
       vault_post_data "$data" "$ADDR/$SECRET_DATA/$4"
       ;;
@@ -486,7 +492,7 @@ create)
     ;;
   approle-secret)
     # eg: create approle-secret bff
-    echo -e "creating secret-id for approle $3"
+    echo_debug "creating secret-id for approle $3"
 
     vault_post_no_data "$ADDR/$AUTH_APPROLE_ROLE/$3/secret-id" -X POST
     ;;
@@ -504,18 +510,18 @@ create)
     for-role)
       rolename="${4:?'syntax: create token for-role roleName'}"
 
-      echo -e "creating token for role: $rolename"
+      echo_debug "creating token for role: $rolename"
       vault_post_no_data $ADDR/$TOKEN_CREATE_CHILD/$rolename
       ;;
     child)
       payload="${4:?$syntax}"
       payload_path=$(get_payload_path $payload)
 
-      echo -e "creating child token with payload:$payload_path"
+      echo_debug "creating child token with payload:$payload_path"
       vault_post_data "@${payload_path}" $ADDR/$TOKEN_CREATE_CHILD
       ;;
-    orphan) echo -e "TODO: creating orphan tokens not setup for payload" ;;
-    *) echo -e $syntax ;;
+    orphan) echo_debug "TODO: creating orphan tokens not setup for payload" ;;
+    *) echo_debug $syntax ;;
     esac
     ;;
   poly)
@@ -534,36 +540,36 @@ get)
 
     case $getwhat in
     self)
-      echo -e 'running credit check...'
+      echo_debug 'running credit check...'
       vault_curl_auth $ADDR/$TOKEN_INFO
       ;;
     info)
       if test -v $id; then
-        echo -e 'syntax: get token info tokenId'
+        echo_debug 'syntax: get token info tokenId'
         exit 1
       fi
 
       data=$(data_token_only $id)
-      echo -e "getting info for token: $data"
+      echo_debug "getting info for token: $data"
       vault_post_data $data $ADDR/$TOKEN_INFO
       ;;
     axor)
       if test -v $id; then
-        echo -e 'syntax: get token axor accessorId'
+        echo_debug 'syntax: get token axor accessorId'
         exit 1
       fi
 
       data=$(data_axor_only $id)
-      echo -e "getting info for token via accessor id: $data"
+      echo_debug "getting info for token via accessor id: $data"
       vault_post_data $data $ADDR/$TOKEN_INFO_ACCESSOR
       ;;
-    *) echo -e $getwhat ;;
+    *) echo_debug $getwhat ;;
     esac
     ;;
   postgres)
     case $3 in
     creds)
-      echo -e "getting postgres creds for dbRole $4"
+      echo_debug "getting postgres creds for dbRole $4"
       vault_curl_auth "$ADDR/$DB_CREDS/$4"
       ;;
     *) invalid_request ;;
@@ -580,7 +586,7 @@ get)
   approle-creds)
     # eg get creds roleId secretId
     data=$(data_login $3 $4)
-    echo -e "getting creds for $3 with $data"
+    echo_debug "getting creds for $3 with $data"
 
     vault_post_data_no_auth $data "$ADDR/$AUTH_APPROLE/login"
     ;;
@@ -588,18 +594,18 @@ get)
     case $3 in
     info)
       # eg get approle info bff
-      echo -e "getting info for approle $4"
+      echo_debug "getting info for approle $4"
 
       vault_curl_auth "$ADDR/$AUTH_APPROLE_ROLE/$4"
       ;;
     id)
       # eg: get approle id bff
-      echo -e "getting id for approle $4"
+      echo_debug "getting id for approle $4"
 
       vault_curl_auth "$ADDR/$AUTH_APPROLE_ROLE/$4/role-id"
       ;;
     secret-id)
-      echo -e "looking up secret-id for approle $4"
+      echo_debug "looking up secret-id for approle $4"
       syntax='get approle secret-id roleName secretId'
       rolename=${4:?$syntax}
       secretid=${5:?$syntax}
@@ -608,7 +614,7 @@ get)
       vault_post_data "${data}" "$ADDR/$AUTH_APPROLE_ROLE/$rolename/secret-id/lookup"
       ;;
     secret-id-axor)
-      echo -e "looking up secret-id accesor for approle $4"
+      echo_debug "looking up secret-id accesor for approle $4"
       syntax='get approle secret-id-axor roleName secretIdAccessor'
       rolename=${4:?$syntax}
       secretid=${5:?$syntax}
@@ -632,15 +638,15 @@ renew)
   case $who in
   self)
     # ADDR/TOKEN_RENEW_SELF
-    echo -e 'renewing self not setup'
+    echo_debug 'renewing self not setup'
     ;;
   id)
     # data_token_only $1 ADDR/TOKEN_RENEW_ID
-    echo -e "renewing token ids not setup"
+    echo_debug "renewing token ids not setup"
     ;;
   axor)
     # data_axor_only $1 ADDR/TOKEN_RENEW_AXOR
-    echo -e "renewing token via accessors not setup"
+    echo_debug "renewing token via accessors not setup"
     ;;
   esac
   ;;
@@ -651,40 +657,40 @@ revoke)
   case $revokewhat in
   token)
     if test -v $id; then
-      echo -e 'syntax: revoke token tokenId'
+      echo_debug 'syntax: revoke token tokenId'
       exit 1
     fi
 
     data=$(data_token_only $id)
-    echo -e "revoking token: $data"
+    echo_debug "revoking token: $data"
     vault_post_data $data $ADDR/$TOKEN_REVOKE_ID
     ;;
   axor)
     if test -v $id; then
-      echo -e 'syntax: revoke axor accessorId'
+      echo_debug 'syntax: revoke axor accessorId'
       exit 1
     fi
 
     data=$(data_axor_only $id)
-    echo -e "revoking token via accessor: $data"
+    echo_debug "revoking token via accessor: $data"
     vault_post_data $data $ADDR/$TOKEN_REVOKE_AXOR
     ;;
   parent)
     if test -v $id; then
-      echo -e 'syntax: revoke parent tokenId'
+      echo_debug 'syntax: revoke parent tokenId'
       exit 1
     fi
 
     data=$(data_token_only $id)
-    echo -e "revoking parent & parent secrets, orphaning children: $data"
+    echo_debug "revoking parent & parent secrets, orphaning children: $data"
     vault_post_data $data $ADDR/$TOKEN_REVOKE_PARENT
     ;;
   self)
-    echo -e "good bye!"
+    echo_debug "good bye!"
     vault_post_no_data $ADDR/$TOKEN_REVOKE_SELF
     ;;
   approle-secret-id)
-    echo -e "revoking secret-id for approle $4"
+    echo_debug "revoking secret-id for approle $4"
     syntax='revoke approle-secret-id roleName secretId'
     rolename=${3:?$syntax}
     secretid=${4:?$syntax}
@@ -693,7 +699,7 @@ revoke)
     vault_post_data "${data}" "$ADDR/$AUTH_APPROLE_ROLE/$rolename/secret-id/destroy"
     ;;
   approle-secret-id-axor)
-    echo -e "revoking secret-id accessor for approle $4"
+    echo_debug "revoking secret-id accessor for approle $4"
     syntax='revoke approle-secret-id-axor roleName secretIdAccessor'
     rolename=${3:?$syntax}
     secretidAxor=${4:?$syntax}
@@ -711,7 +717,7 @@ rm)
   case $rmwhat in
   token-role)
     # -X DELETE? auth/token/roles/$id
-    echo -e 'delete token role not setup'
+    echo_debug 'delete token role not setup'
     ;;
   approle-role) vault_delete "$ADDR/$AUTH_APPROLE_ROLE/${id:?'syntax: rm approle roleName'}" ;;
   esac
