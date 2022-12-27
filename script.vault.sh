@@ -413,11 +413,11 @@ process_tokens_in_dir() {
 
       # save role-id if it doesnt exist in $JAIL
       if test ! -f "$ROLE_ID_FILE"; then
-        vault_curl_auth "$ADDR/$AUTH_APPROLE_ROLE/$ROLE_NAME/role-id" >$ROLE_ID_FILE
+        vault_curl_auth "$ADDR/$AUTH_APPROLE_ROLE/$token_type/role-id" >$ROLE_ID_FILE
       fi
 
       # save new secret-id for authenticating as role-id
-      vault_post_no_data "$ADDR/$AUTH_APPROLE_ROLE/$ROLE_NAME/secret-id" -X POST >$CREDENTIAL_FILE
+      vault_post_no_data "$ADDR/$AUTH_APPROLE_ROLE/$token_type/secret-id" -X POST >$CREDENTIAL_FILE
       ;;
     token_create_token_role)
       echo_debug "\n$auth_scheme\n\n[TOKEN_FILE]: $CREDENTIAL_FILE\n"
