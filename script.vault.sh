@@ -384,6 +384,49 @@ process_token_role_in_dir() {
     esac
   done
 }
+process_tokens_in_dir() {
+  local token_dir_full_path="$(pwd)/$1/*"
+  echo_debug "\nchecking for token create files in: $token_dir_full_path"
+
+  for file_starts_with_token_create_ in $token_dir_full_path; do
+    local token_create_filename=$(get_file_name $file_starts_with_token_create_)
+
+    # configure shell to parse filename into expected components
+    PREV_IFS="$IFS"               # save prev boundary
+    IFS="."                       # secret_TYPE.TWO.THREE.FOUR.json
+    set -f                        # stop wildcard * expansion
+    set -- $token_create_filename # break filename @ '.' into positional args
+
+    # reset shell back to normal
+    set +f
+    IFS=$PREV_IFS
+
+    auth_scheme=${1:-''}
+    token_type=${2:-''}
+    token_name=${3:-''}
+
+    case $auth_scheme in
+    token_create_approle)
+      ROLE_ID_FILE="${JAIL}/${token_Type}.id.json"
+      SECRET_ID_FILE="${JAIL}/${token_type}.${token_name}.json"
+      echo_debug "\n$auth_scheme\n[ROLE_ID_FILE]: $ROLE_ID_FILE\n[SECRET_ID_FILE]: $SECRET_ID_FILE\n"
+
+      # save role-id if it doesnt exist in $JAIL
+      if test ! -d $ROLE_ID_FILE; then
+        vault_curl_auth "$ADDR/$AUTH_APPROLE_ROLE/$ROLE_NAME" >$ROLE_ID_FILE
+        # ./script.vault.sh get approle id $ROLE_NAME | jq '.data' >$ROLE_ID_FILE
+      fi
+      # save new secret id
+      vault_post_no_data "$ADDR/$AUTH_APPROLE_ROLE/$ROLE_NAME/secret-id" -X POST >$SECRET_ID_FILE
+      # ./script.vault.sh create approle-secret $ROLE_NAME | jq '.data' >$SECRET_ID_FILE
+      ;;
+    token_create_token_role)
+      echo 'creating token role tokens not setup'
+      ;;
+    *) echo_debug "ignoring file with unknown format: $engine_config_filename" ;;
+    esac
+  done
+}
 process_auths_in_dir() {
   local auth_dir_full_path="$(pwd)/$1/*"
   echo_debug "\nchecking for auth configs in: $auth_dir_full_path"
@@ -481,6 +524,7 @@ create)
   secret)
     case $3 in
     kv2)
+      # FYI: you should prefer the other cmd that accepts a filepath
       # eg create secret kv2 poo/in/ur/eye '{"a": "b", "c": "d"}'
       data="{\"data\": $5 }"
       echo_debug "creating secret at $4 with $data"
@@ -732,7 +776,7 @@ process)
     process_policies_in_dir $dir
     ;;
   token_role_in_dir)
-    dir=${3:?'syntax: process token_in_dir path/to/dir'}
+    dir=${3:?'syntax: process token_role_in_dir path/to/dir'}
     throw_if_dir_doesnt_exist $dir
     process_token_role_in_dir $dir
     ;;
@@ -750,6 +794,11 @@ process)
     dir=${3:?'syntax: process engine_config path/to/dir'}
     throw_if_dir_doesnt_exist $dir
     process_engine_configs $dir
+    ;;
+  token_in_dir)
+    dir=${3:?'syntax: process token_in_dir path/to/dir'}
+    throw_if_dir_doesnt_exist $dir
+    process_tokens_in_dir $dir
     ;;
   *) invalid_request ;;
   esac
