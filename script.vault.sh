@@ -407,13 +407,13 @@ process_tokens_in_dir() {
 
     case $auth_scheme in
     token_create_approle)
-      ROLE_ID_FILE="${JAIL}/${token_Type}.id.json"
+      ROLE_ID_FILE="${JAIL}/${token_type}.id.json"
       SECRET_ID_FILE="${JAIL}/${token_type}.${token_name}.json"
-      echo_debug "\n$auth_scheme\n[ROLE_ID_FILE]: $ROLE_ID_FILE\n[SECRET_ID_FILE]: $SECRET_ID_FILE\n"
+      echo_debug "\n$auth_scheme\n\n[ROLE_ID_FILE]: $ROLE_ID_FILE\n[SECRET_ID_FILE]: $SECRET_ID_FILE\n"
 
       # save role-id if it doesnt exist in $JAIL
-      if test ! -d $ROLE_ID_FILE; then
-        vault_curl_auth "$ADDR/$AUTH_APPROLE_ROLE/$ROLE_NAME" >$ROLE_ID_FILE
+      if test ! -f "$ROLE_ID_FILE"; then
+        vault_curl_auth "$ADDR/$AUTH_APPROLE_ROLE/$ROLE_NAME/role-id" >$ROLE_ID_FILE
         # ./script.vault.sh get approle id $ROLE_NAME | jq '.data' >$ROLE_ID_FILE
       fi
       # save new secret id
