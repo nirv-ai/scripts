@@ -404,24 +404,26 @@ process_tokens_in_dir() {
     auth_scheme=${1:-''}
     token_type=${2:-''}
     token_name=${3:-''}
+    ROLE_ID_FILE="${JAIL}/${token_type}.id.json"
+    CREDENTIAL_FILE="${JAIL}/${token_type}.${token_name}.json"
 
     case $auth_scheme in
     token_create_approle)
-      ROLE_ID_FILE="${JAIL}/${token_type}.id.json"
-      SECRET_ID_FILE="${JAIL}/${token_type}.${token_name}.json"
-      echo_debug "\n$auth_scheme\n\n[ROLE_ID_FILE]: $ROLE_ID_FILE\n[SECRET_ID_FILE]: $SECRET_ID_FILE\n"
+      echo_debug "\n$auth_scheme\n\n[ROLE_ID_FILE]: $ROLE_ID_FILE\n[SECRET_ID_FILE]: $CREDENTIAL_FILE\n"
 
       # save role-id if it doesnt exist in $JAIL
       if test ! -f "$ROLE_ID_FILE"; then
         vault_curl_auth "$ADDR/$AUTH_APPROLE_ROLE/$ROLE_NAME/role-id" >$ROLE_ID_FILE
-        # ./script.vault.sh get approle id $ROLE_NAME | jq '.data' >$ROLE_ID_FILE
       fi
-      # save new secret id
-      vault_post_no_data "$ADDR/$AUTH_APPROLE_ROLE/$ROLE_NAME/secret-id" -X POST >$SECRET_ID_FILE
-      # ./script.vault.sh create approle-secret $ROLE_NAME | jq '.data' >$SECRET_ID_FILE
+
+      # save new secret-id for authenticating as role-id
+      vault_post_no_data "$ADDR/$AUTH_APPROLE_ROLE/$ROLE_NAME/secret-id" -X POST >$CREDENTIAL_FILE
       ;;
     token_create_token_role)
-      echo 'creating token role tokens not setup'
+      echo_debug "\n$auth_scheme\n\n[TOKEN_FILE]: $CREDENTIAL_FILE\n"
+
+      # save new token for authenticating as token_role
+      vault_post_no_data $ADDR/$TOKEN_CREATE_CHILD/$token_type >$CREDENTIAL_FILE
       ;;
     *) echo_debug "ignoring file with unknown format: $engine_config_filename" ;;
     esac
@@ -547,7 +549,7 @@ create)
     create_approle $payload_path
     ;;
   token)
-    syntax='syntax: create token [child|orphan] path/to/payload.json'
+    syntax='syntax: create token [child|orphan] path/to/payload.json | for-role roleName'
     tokentype=${3:-''}
 
     case $tokentype in
