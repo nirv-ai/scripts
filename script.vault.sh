@@ -227,12 +227,12 @@ get_single_unseal_token() {
   )
 }
 get_unseal_tokens() {
-  echo_debug "VAULT_TOKEN:\n\n$VAULT_TOKEN\n"
-  echo_debug "UNSEAL_TOKEN(s):\n"
+  echo -e "VAULT_TOKEN:\n\n$VAULT_TOKEN\n"
+  echo -e "UNSEAL_TOKEN(s):\n"
   unseal_threshold=$(cat $JAIL/root.unseal.json | jq '.unseal_threshold')
   i=0
   while [ $i -lt $unseal_threshold ]; do
-    echo_debug "\n$(get_single_unseal_token $i)"
+    echo -e "\n$(get_single_unseal_token $i)"
     i=$((i + 1))
   done
 }
