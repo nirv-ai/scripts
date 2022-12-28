@@ -1,1 +1,1 @@
-letsencrypt/script.letscrypt.create.sh
+./letsencrypt/script.letscrypt.create.sh

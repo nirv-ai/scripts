@@ -1,1 +1,1 @@
-letsencrypt/script.letscrypt.automated.sh
+./letsencrypt/script.letscrypt.automated.sh

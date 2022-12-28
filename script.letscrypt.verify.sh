@@ -1,1 +1,1 @@
-letsencrypt/script.letscrypt.verify.sh
+./letsencrypt/script.letscrypt.verify.sh
