@@ -1,0 +1,1 @@
+./letsencrypt/script.letscrypt.automated.sh
