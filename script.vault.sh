@@ -12,12 +12,19 @@ DEBUG=${NIRV_SCRIPT_DEBUG:-''}
 # vars
 TOKEN_HEADER="X-Vault-Token: $TOKEN"
 
+# VAULT FEATURE ENABLED PATHS
+## modify the path at which a vault feature is enabled
+## if you change these, you will need to change the config files
+SECRET_KV1=${KV1_PATH:-env} # [GET|LIST] this/:path, POST this/:path {json}
+SECRET_KV2=${KV2_PATH:-secret}
+DB=${DB_PATH:-database}
+AUTH=${AUTH_PATH:-auth}
+
 # endpoints
-AUTH_APPROLE=auth/approle
+AUTH_APPROLE=$AUTH/approle
 AUTH_APPROLE_ROLE=$AUTH_APPROLE/role
-AUTH_TOKEN=auth/token
+AUTH_TOKEN=$AUTH/token
 AUTH_TOKEN_ACCESSORS=$AUTH_TOKEN/accessors
-DB=database
 DB_CONFIG=$DB/config                  # LIST this, DELETE this/:name, POST this/:name {connection}
 DB_CREDS=$DB/creds                    # GET this/:name
 DB_RESET=$DB/reset                    # POST this/:name,
@@ -40,23 +47,19 @@ TOKEN_REVOKE_SELF=$AUTH_TOKEN/revoke-self
 TOKEN_REVOKE_AXOR=$AUTH_TOKEN/revoke-accessor
 TOKEN_REVOKE_PARENT=$AUTH_TOKEN/revoke-orphan # children become orphans, parent secrets revoked
 TOKEN_ROLES=$AUTH_TOKEN/roles                 # LIST this, [DELETE|POST] this/:roleId
-# the default kv1 engine is mounted at env
-SECRET_KV1=env # [GET|LIST] this/:path, POST this/:path {json}
-# the default kv2 engine is mounted at secret
-SECRET_KV2=secret
-SECRET_KV2_DATA=$SECRET_KV2/data        # GET this/:path?version=X, PATCH this/:path {json} -H Content-Type application/merge-patch+json, DELETE this/:path
-SECRET_KV2_RM=$SECRET_KV2/delete        # POST this/:path {json}
-SECRET_KV2_RM_UNDO=$SECRET_KV2/undelete # POST this/:path {json}
-SECRET_KV2_ERASE=$SECRET_KV2/destroy    # POST this:path {json}
-SECRET_KV2_CONFIG=$SECRET_KV2/config    # GET this, POST this {config}
-SECRET_KV2_SUBKEYS=$SECRET_KV2/subkeys  # GET this/:path?version=X&depth=Y
-SECRET_KV2_KEYS=$SECRET_KV2/metadata    # [GET|LIST|DELETE] this/:path, POST this/:path {json}, PATCH this/:path {json} -H Content-Type application/merge-patch+json,
+SECRET_KV2_DATA=$SECRET_KV2/data              # GET this/:path?version=X, PATCH this/:path {json} -H Content-Type application/merge-patch+json, DELETE this/:path
+SECRET_KV2_RM=$SECRET_KV2/delete              # POST this/:path {json}
+SECRET_KV2_RM_UNDO=$SECRET_KV2/undelete       # POST this/:path {json}
+SECRET_KV2_ERASE=$SECRET_KV2/destroy          # POST this:path {json}
+SECRET_KV2_CONFIG=$SECRET_KV2/config          # GET this, POST this {config}
+SECRET_KV2_SUBKEYS=$SECRET_KV2/subkeys        # GET this/:path?version=X&depth=Y
+SECRET_KV2_KEYS=$SECRET_KV2/metadata          # [GET|LIST|DELETE] this/:path, POST this/:path {json}, PATCH this/:path {json} -H Content-Type application/merge-patch+json,
 SYS_AUTH=sys/auth
 SYS_HEALTH=sys/health
 SYS_MOUNTS=sys/mounts
 SYS_LEASES=sys/leases
 SYS_LEASES_LOOKUP=$SYS_LEASES/lookup
-SYS_LEASES_LOOKUP_DB_CREDS=$SYS_LEASES_LOOKUP/database/creds
+SYS_LEASES_LOOKUP_DB_CREDS=$SYS_LEASES_LOOKUP/$DB/creds
 SYS_POLY=sys/policies
 SYS_POLY_ACL=$SYS_POLY/acl # PUT this/:polyName
 
@@ -65,7 +68,7 @@ echo_debug() {
   if [ "$DEBUG" = 1 ]; then
     echo -e '\n\n[DEBUG] SCRIPT.VAULT.SH\n------------'
     echo -e "$@"
-    echo '\n------------\n\n'
+    echo "\n------------\n\n"
   fi
 }
 
@@ -496,8 +499,13 @@ list)
     echo_debug 'listing all tokens'
     vault_list $ADDR/$AUTH_TOKEN_ACCESSORS
     ;;
-  secrets)
-    vault_list "$ADDR/$SECRET_DATA/$3"
+  secret-keys)
+    syntax='syntax: list secret-keys kv[1|2] secretPath'
+    secret_path=${4:-''}
+    case $3 in
+    kv1) vault_list "$ADDR/$SECRET_KV1/$secret_path" ;;
+    kv2) vault_list "$ADDR/$SECRET_KV2/$secret_path" ;;
+    esac
     ;;
   secret-engines)
     vault_curl_auth "$ADDR/$SYS_MOUNTS"
@@ -527,8 +535,14 @@ create)
   secret)
     case $3 in
     kv2)
-      echo_debug 'kv2 secrets need to be refactored'
-      # vault_post_data "$data" "$ADDR/$SECRET_DATA/$4"
+      syntax='syntax: create secret kv2 secretPath pathToJson'
+      secret_path=${4:?$syntax}
+      payload=${5:?$syntax}
+      payload_path=$(get_payload_path $payload)
+      throw_if_file_doesnt_exist $payload_path
+      echo_debug "creating secret at $secret_path with $payload_path"
+
+      vault_post_data "@${payload_path}" "$ADDR/$SECRET_KV2_DATA/$secret_path"
       ;;
     kv1)
       syntax='syntax: create secret kv1 secretPath pathToJson'
@@ -630,7 +644,7 @@ get)
     ;;
   secret)
     # eg: get secret secret/foo
-    vault_curl_auth "$ADDR/$SECRET_DATA/$3"
+    vault_curl_auth "$ADDR/$SECRET_KV2/$3"
     ;;
   status)
     # eg get status
@@ -769,7 +783,7 @@ rm)
 
   case $rmwhat in
   token-role)
-    # -X DELETE? auth/token/roles/$id
+    # -X DELETE? $AUTH/token/roles/$id
     echo_debug 'delete token role not setup'
     ;;
   approle-role) vault_delete "$ADDR/$AUTH_APPROLE_ROLE/${id:?'syntax: rm approle roleName'}" ;;
