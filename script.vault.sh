@@ -151,6 +151,9 @@ data_type_only() {
   )
   echo $data
 }
+data_data_only() {
+  echo "{ \"data\": $(cat $1 | jq)}"
+}
 data_token_only() {
   local data=$(
     jq -n -c \
@@ -386,7 +389,7 @@ process_token_role_in_dir() {
 }
 process_tokens_in_dir() {
   # TODO: grep for everything like this
-  # ^ it should use get_payload_path which checks for leading / and ./
+  # ^ it should use get_payload_path which checks for leading `/` and `.`
   local token_dir_full_path="$(pwd)/$1/*"
   echo_debug "\nchecking for token create files in: $token_dir_full_path"
 
@@ -413,12 +416,8 @@ process_tokens_in_dir() {
     token_create_approle)
       echo_debug "\n$auth_scheme\n\n[ROLE_ID_FILE]: $ROLE_ID_FILE\n[SECRET_ID_FILE]: $CREDENTIAL_FILE\n"
 
-      # save role-id if it doesnt exist in $JAIL
-      # TODO: remove this check, as it makes us have to remember
-      # ^ to delete the role_id_file if we reset vault to a green state
-      if test ! -f "$ROLE_ID_FILE"; then
-        vault_curl_auth "$ADDR/$AUTH_APPROLE_ROLE/$token_type/role-id" >$ROLE_ID_FILE
-      fi
+      # save role-id
+      vault_curl_auth "$ADDR/$AUTH_APPROLE_ROLE/$token_type/role-id" >$ROLE_ID_FILE
 
       # save new secret-id for authenticating as role-id
       vault_post_no_data "$ADDR/$AUTH_APPROLE_ROLE/$token_type/secret-id" -X POST >$CREDENTIAL_FILE
@@ -476,10 +475,50 @@ enable_something_in_dir() {
     esac
   done
 }
+hydrate_data_in_dir() {
+  local hydrate_dir_full_path="$(get_payload_path $1)/*"
+  echo_debug "\nchecking for hydration files in: $hydrate_dir_full_path"
 
+  for file_starts_with_hydrate_ in $hydrate_dir_full_path; do
+    local data_hydrate_filename=$(get_file_name $hydrate_dir_full_path)
+
+    # configure shell to parse filename into expected components
+    PREV_IFS="$IFS"               # save prev boundary
+    IFS="."                       # hydrate_ENGINE_TYPE.ENGINE_PATH.SECRET_PATH.json
+    set -f                        # stop wildcard * expansion
+    set -- $data_hydrate_filename # break filename @ '.' into positional a rgs
+
+    # reset shell back to normal
+    set +f
+    IFS=$PREV_IFS
+
+    engine_type=${1:-''}
+    engine_path=${2:-''}
+    secret_path=${3:-''}
+
+    case $engine_type in
+    hydrate_kv1)
+      echo_debug "\n$engtype_type\n\n[ENGINE_PATH]: $engine_path\n[SECRET_PATH]: $secret_path\n"
+
+      vault_post_data "@${file_starts_with_hydrate_}" "$ADDR/$SECRET_KV1/$secret_path"
+
+      ;;
+    hydrate_kv2)
+      echo_debug "\n$engtype_type\n\n[ENGINE_PATH]: $engine_path\n[SECRET_PATH]: $secret_path\n"
+      payload_data=$(data_data_only $file_starts_with_hydrate_)
+      vault_post_data "${payload_data}" "$ADDR/$SECRET_KV2_DATA/$secret_path"
+      ;;
+    *) echo_debug "ignoring file with unknown format: $engine_config_filename" ;;
+    esac
+  done
+}
 case $1 in
 init) init_vault ;;
 get_unseal_tokens) get_unseal_tokens ;;
+get_single_unseal_token)
+  token_index=${2-0}
+  echo -e "\n----\n\n$(get_single_unseal_token $token_index)\n\n----\n"
+  ;;
 unseal) unseal_vault ;;
 enable)
   case $2 in
@@ -530,6 +569,25 @@ list)
   *) invalid_request ;;
   esac
   ;;
+patch)
+  case $2 in
+  secret)
+    case $3 in
+    kv2)
+      syntax='syntax: patch secret kv2 secretPath pathToJson'
+      secret_path=${4:?$syntax}
+      payload=${5:?$syntax}
+      payload_path=$(get_payload_path $payload)
+      throw_if_file_doesnt_exist $payload_path
+      payload_data=$(data_data_only $payload_path)
+      echo_debug "patching secret at $secret_path with $payload_data"
+
+      vault_patch_data "${payload_data}" "$ADDR/$SECRET_KV2_DATA/$secret_path"
+      ;;
+    esac
+    ;;
+  esac
+  ;;
 create)
   case $2 in
   secret)
@@ -540,9 +598,10 @@ create)
       payload=${5:?$syntax}
       payload_path=$(get_payload_path $payload)
       throw_if_file_doesnt_exist $payload_path
-      echo_debug "creating secret at $secret_path with $payload_path"
+      payload_data=$(data_data_only $payload_path)
+      echo_debug "creating secret at $secret_path with $payload_data"
 
-      vault_post_data "@${payload_path}" "$ADDR/$SECRET_KV2_DATA/$secret_path"
+      vault_post_data "${payload_data}" "$ADDR/$SECRET_KV2_DATA/$secret_path"
       ;;
     kv1)
       syntax='syntax: create secret kv1 secretPath pathToJson'
@@ -642,10 +701,14 @@ get)
     *) invalid_request ;;
     esac
     ;;
+  secret-kv2-config) vault_curl_auth "$ADDR/$SECRET_KV2_CONFIG" ;;
   secret)
     secret_path=${4:?'syntax: get secret kv[1|2] secretPath'}
     case $3 in
-    kv2) vault_curl_auth "$ADDR/$SECRET_KV2/$secret_path" ;;
+    kv2)
+      version=${5:-''}
+      vault_curl_auth "$ADDR/$SECRET_KV2_DATA/$secret_path?version=$version"
+      ;;
     kv1) vault_curl_auth "$ADDR/$SECRET_KV1/$secret_path" ;;
     *) invalid_request ;;
     esac
@@ -834,6 +897,11 @@ process)
     dir=${3:?'syntax: process token_in_dir path/to/dir'}
     throw_if_dir_doesnt_exist $dir
     process_tokens_in_dir $dir
+    ;;
+  secret_data_in_dir)
+    dir=${3:?'syntax: process hydrate_secret_data path/to/dir'}
+    throw_if_dir_doesnt_exist $dir
+    hydrate_data_in_dir $dir
     ;;
   *) invalid_request ;;
   esac
