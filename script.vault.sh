@@ -289,7 +289,8 @@ enable_something() {
 }
 ################################ workflows
 process_policies_in_dir() {
-  local policy_dir_full_path="$(pwd)/$1/*"
+  local policy_dir_full_path="$(get_payload_path $1)/*"
+  throw_if_dir_doesnt_exist $policy_dir_full_path
   echo_debug "\nchecking for policies in: $policy_dir_full_path"
 
   for file_starts_with_policy_ in $policy_dir_full_path; do
@@ -302,7 +303,8 @@ process_policies_in_dir() {
   done
 }
 process_engine_configs() {
-  local engine_config_dir_full_path="$(pwd)/$1/*"
+  local engine_config_dir_full_path="$(get_payload_path $1)/*"
+  throw_if_dir_doesnt_exist $engine_config_dir_full_path
   echo_debug "\nchecking for engine configuration files in: $engine_config_dir_full_path"
 
   for file_starts_with_secret_ in $engine_config_dir_full_path; do
@@ -358,7 +360,8 @@ process_engine_configs() {
   done
 }
 process_token_role_in_dir() {
-  local token_role_dir_full_path="$(pwd)/$1/*"
+  local token_role_dir_full_path="$(get_payload_path $1)/*"
+  throw_if_dir_doesnt_exist $token_role_dir_full_path
   echo_debug "\nchecking for token roles in: $token_role_dir_full_path"
 
   for file_starts_with_token_role in $token_role_dir_full_path; do
@@ -388,9 +391,8 @@ process_token_role_in_dir() {
   done
 }
 process_tokens_in_dir() {
-  # TODO: grep for everything like this
-  # ^ it should use get_payload_path which checks for leading `/` and `.`
-  local token_dir_full_path="$(pwd)/$1/*"
+  local token_dir_full_path="$(get_payload_path $1)/*"
+  throw_if_dir_doesnt_exist $token_dir_full_path
   echo_debug "\nchecking for token create files in: $token_dir_full_path"
 
   for file_starts_with_token_create_ in $token_dir_full_path; do
@@ -433,7 +435,8 @@ process_tokens_in_dir() {
   done
 }
 process_auths_in_dir() {
-  local auth_dir_full_path="$(pwd)/$1/*"
+  local auth_dir_full_path="$(get_payload_path $1)/*"
+  throw_if_dir_doesnt_exist $auth_dir_full_path
   echo_debug "\nchecking for auth configs in: $auth_dir_full_path"
 
   for file_starts_with_auth_ in $auth_dir_full_path; do
@@ -446,7 +449,8 @@ process_auths_in_dir() {
   done
 }
 enable_something_in_dir() {
-  local enable_something_full_dir="$(pwd)/$1/*"
+  local enable_something_full_dir="$(get_payload_path $1)/*"
+  throw_if_dir_doesnt_exist $enable_something_full_dir
   echo_debug "\nchecking for enable.thisthing.atthispath files in:\n$enable_something_full_dir\n"
 
   for file_starts_with_enable_X in $enable_something_full_dir; do
@@ -476,11 +480,15 @@ enable_something_in_dir() {
   done
 }
 hydrate_data_in_dir() {
-  local hydrate_dir_full_path="$(get_payload_path $1)/*"
+  local hydrate_dir_full_path_no_asterisk="$(get_payload_path $1)"
+  throw_if_dir_doesnt_exist $hydrate_dir_full_path_no_asterisk
+
+  local hydrate_dir_full_path="$hydrate_dir_full_path_no_asterisk/*"
+
   echo_debug "\nchecking for hydration files in: $hydrate_dir_full_path"
 
   for file_starts_with_hydrate_ in $hydrate_dir_full_path; do
-    local data_hydrate_filename=$(get_file_name $hydrate_dir_full_path)
+    local data_hydrate_filename=$(get_file_name $file_starts_with_hydrate_)
 
     # configure shell to parse filename into expected components
     PREV_IFS="$IFS"               # save prev boundary
@@ -497,16 +505,16 @@ hydrate_data_in_dir() {
     secret_path=${3:-''}
 
     case $engine_type in
-    hydrate_kv1)
-      echo_debug "\n$engtype_type\n\n[ENGINE_PATH]: $engine_path\n[SECRET_PATH]: $secret_path\n"
+    'hydrate_kv1')
+      echo_debug "\n$engine_type\n\n[ENGINE_PATH]: $engine_path\n[SECRET_PATH]: $secret_path\n"
 
       vault_post_data "@${file_starts_with_hydrate_}" "$ADDR/$SECRET_KV1/$secret_path"
 
       ;;
-    hydrate_kv2)
-      echo_debug "\n$engtype_type\n\n[ENGINE_PATH]: $engine_path\n[SECRET_PATH]: $secret_path\n"
+    'hydrate_kv2')
+      echo_debug "\n$engine_type\n\n[ENGINE_PATH]: $engine_path\n[SECRET_PATH]: $secret_path\n"
       payload_data=$(data_data_only $file_starts_with_hydrate_)
-      vault_post_data "${payload_data}" "$ADDR/$SECRET_KV2_DATA/$secret_path"
+      vault_post_data "${payload_data}" "$ADDR/$SECRET_KV2_DATA/$secret_path" >/dev/null
       ;;
     *) echo_debug "ignoring file with unknown format: $engine_config_filename" ;;
     esac
@@ -869,38 +877,31 @@ process)
 
   case $processwhat in
   policy_in_dir)
-    dir=${3:?'syntax: process policy_in_dir path/to/dir'}
-    throw_if_dir_doesnt_exist $dir
+    dir=${3:?'syntax: process policy_in_dir [/]path/to/dir'}
     process_policies_in_dir $dir
     ;;
   token_role_in_dir)
-    dir=${3:?'syntax: process token_role_in_dir path/to/dir'}
-    throw_if_dir_doesnt_exist $dir
+    dir=${3:?'syntax: process token_role_in_dir [/]path/to/dir'}
     process_token_role_in_dir $dir
     ;;
   auth_in_dir)
-    dir=${3:?'syntax: process auth_in_dir path/to/dir'}
-    throw_if_dir_doesnt_exist $dir
+    dir=${3:?'syntax: process auth_in_dir [/]path/to/dir'}
     process_auths_in_dir $dir
     ;;
   enable_feature)
-    dir=${3:?'syntax: process enable_feature path/to/dir'}
-    throw_if_dir_doesnt_exist $dir
+    dir=${3:?'syntax: process enable_feature [/]path/to/dir'}
     enable_something_in_dir $dir
     ;;
   engine_config)
-    dir=${3:?'syntax: process engine_config path/to/dir'}
-    throw_if_dir_doesnt_exist $dir
+    dir=${3:?'syntax: process engine_config [/]path/to/dir'}
     process_engine_configs $dir
     ;;
   token_in_dir)
-    dir=${3:?'syntax: process token_in_dir path/to/dir'}
-    throw_if_dir_doesnt_exist $dir
+    dir=${3:?'syntax: process token_in_dir [/]path/to/dir'}
     process_tokens_in_dir $dir
     ;;
   secret_data_in_dir)
-    dir=${3:?'syntax: process hydrate_secret_data path/to/dir'}
-    throw_if_dir_doesnt_exist $dir
+    dir=${3:?'syntax: process hydrate_secret_data [/]path/to/dir'}
     hydrate_data_in_dir $dir
     ;;
   *) invalid_request ;;
