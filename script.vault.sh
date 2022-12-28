@@ -15,26 +15,25 @@ TOKEN_HEADER="X-Vault-Token: $TOKEN"
 # VAULT FEATURE ENABLED PATHS
 ## modify the path at which a vault feature is enabled
 ## if you change these, you will need to change the config files
-SECRET_KV1=${KV1_PATH:-env} # [GET|LIST|DELETE] this/:path, POST this/:path {json}
-SECRET_KV2=${KV2_PATH:-secret}
-DB=${DB_PATH:-database}
-AUTH=${AUTH_PATH:-auth}
+SECRET_KV1=env # [GET|LIST|DELETE] this/:path, POST this/:path {json}
+SECRET_KV2=secret
+DB_ENGINE=database
+AUTH_APPROLE=auth/approle
 
 # endpoints
-AUTH_APPROLE=$AUTH/approle
 AUTH_APPROLE_ROLE=$AUTH_APPROLE/role
-AUTH_TOKEN=$AUTH/token
+AUTH_TOKEN=auth/token
 AUTH_TOKEN_ACCESSORS=$AUTH_TOKEN/accessors
-DB_CONFIG=$DB/config                  # LIST this, DELETE this/:name, POST this/:name {connection}
-DB_CREDS=$DB/creds                    # GET this/:name
-DB_RESET=$DB/reset                    # POST this/:name,
-DB_ROLES=$DB/roles                    # LIST this, [GET|DELETE] this/:name, POST this/:name {config},
-DB_ROTATE=$DB/rotate-root             # POST this/:name ,
-DB_STATIC_ROLE=$DB/static-roles       # LIST this, [GET|DELETE] this/:name, POST this/:name {config}
-DB_STATIC_CREDS=$DB/static-creds      # GET this/:name,
-DB_STATIC_ROTATE=$DB/rotate-role      # POST this/:name,
-TOKEN_CREATE_CHILD=$AUTH_TOKEN/create # POST this/:rolename, POST this {config}
-TOKEN_CREATE_ROLE=$AUTH_TOKEN/roles   # POST this/:rolename {config}
+DB_CONFIG=$DB_ENGINE/config             # LIST this, DELETE this/:name, POST this/:name {connection}
+DB_CREDS=$DB_ENGINE/creds               # GET this/:name
+DB_RESET=$DB_ENGINE/reset               # POST this/:name,
+DB_ROLES=$DB_ENGINE/roles               # LIST this, [GET|DELETE] this/:name, POST this/:name {config},
+DB_ROTATE=$DB_ENGINE/rotate-root        # POST this/:name ,
+DB_STATIC_ROLE=$DB_ENGINE/static-roles  # LIST this, [GET|DELETE] this/:name, POST this/:name {config}
+DB_STATIC_CREDS=$DB_ENGINE/static-creds # GET this/:name,
+DB_STATIC_ROTATE=$DB_ENGINE/rotate-role # POST this/:name,
+TOKEN_CREATE_CHILD=$AUTH_TOKEN/create   # POST this/:rolename, POST this {config}
+TOKEN_CREATE_ROLE=$AUTH_TOKEN/roles     # POST this/:rolename {config}
 TOKEN_CREATE_ORPHAN=$AUTH_TOKEN/create-orphan
 TOKEN_INFO=$AUTH_TOKEN/lookup
 TOKEN_INFO_ACCESSOR=$AUTH_TOKEN/lookup-accessor
@@ -59,7 +58,7 @@ SYS_HEALTH=sys/health
 SYS_MOUNTS=sys/mounts
 SYS_LEASES=sys/leases
 SYS_LEASES_LOOKUP=$SYS_LEASES/lookup
-SYS_LEASES_LOOKUP_DB_CREDS=$SYS_LEASES_LOOKUP/$DB/creds
+SYS_LEASES_LOOKUP_DB_CREDS=$SYS_LEASES_LOOKUP/$DB_ENGINE/creds
 SYS_POLY=sys/policies
 SYS_POLY_ACL=$SYS_POLY/acl # PUT this/:polyName
 
@@ -289,8 +288,10 @@ enable_something() {
 }
 ################################ workflows
 process_policies_in_dir() {
-  local policy_dir_full_path="$(get_payload_path $1)/*"
+  local policy_dir_full_path="$(get_payload_path $1)"
   throw_if_dir_doesnt_exist $policy_dir_full_path
+
+  local policy_dir_full_path="$policy_dir_full_path/*"
   echo_debug "\nchecking for policies in: $policy_dir_full_path"
 
   for file_starts_with_policy_ in $policy_dir_full_path; do
@@ -303,8 +304,10 @@ process_policies_in_dir() {
   done
 }
 process_engine_configs() {
-  local engine_config_dir_full_path="$(get_payload_path $1)/*"
+  local engine_config_dir_full_path="$(get_payload_path $1)"
   throw_if_dir_doesnt_exist $engine_config_dir_full_path
+
+  local engine_config_dir_full_path="$engine_config_dir_full_path/*"
   echo_debug "\nchecking for engine configuration files in: $engine_config_dir_full_path"
 
   for file_starts_with_secret_ in $engine_config_dir_full_path; do
@@ -360,8 +363,10 @@ process_engine_configs() {
   done
 }
 process_token_role_in_dir() {
-  local token_role_dir_full_path="$(get_payload_path $1)/*"
+  local token_role_dir_full_path="$(get_payload_path $1)"
   throw_if_dir_doesnt_exist $token_role_dir_full_path
+
+  local token_role_dir_full_path="$token_role_dir_full_path/*"
   echo_debug "\nchecking for token roles in: $token_role_dir_full_path"
 
   for file_starts_with_token_role in $token_role_dir_full_path; do
@@ -391,8 +396,10 @@ process_token_role_in_dir() {
   done
 }
 process_tokens_in_dir() {
-  local token_dir_full_path="$(get_payload_path $1)/*"
+  local token_dir_full_path="$(get_payload_path $1)"
   throw_if_dir_doesnt_exist $token_dir_full_path
+
+  local token_dir_full_path="$token_dir_full_path/*"
   echo_debug "\nchecking for token create files in: $token_dir_full_path"
 
   for file_starts_with_token_create_ in $token_dir_full_path; do
@@ -435,8 +442,10 @@ process_tokens_in_dir() {
   done
 }
 process_auths_in_dir() {
-  local auth_dir_full_path="$(get_payload_path $1)/*"
+  local auth_dir_full_path="$(get_payload_path $1)"
   throw_if_dir_doesnt_exist $auth_dir_full_path
+
+  local auth_dir_full_path="$auth_dir_full_path/*"
   echo_debug "\nchecking for auth configs in: $auth_dir_full_path"
 
   for file_starts_with_auth_ in $auth_dir_full_path; do
@@ -449,8 +458,10 @@ process_auths_in_dir() {
   done
 }
 enable_something_in_dir() {
-  local enable_something_full_dir="$(get_payload_path $1)/*"
+  local enable_something_full_dir="$(get_payload_path $1)"
   throw_if_dir_doesnt_exist $enable_something_full_dir
+
+  local enable_something_full_dir="$enable_something_full_dir/*"
   echo_debug "\nchecking for enable.thisthing.atthispath files in:\n$enable_something_full_dir\n"
 
   for file_starts_with_enable_X in $enable_something_full_dir; do
@@ -480,10 +491,10 @@ enable_something_in_dir() {
   done
 }
 hydrate_data_in_dir() {
-  local hydrate_dir_full_path_no_asterisk="$(get_payload_path $1)"
-  throw_if_dir_doesnt_exist $hydrate_dir_full_path_no_asterisk
+  local hydrate_dir_full_path="$(get_payload_path $1)"
+  throw_if_dir_doesnt_exist $hydrate_dir_full_path
 
-  local hydrate_dir_full_path="$hydrate_dir_full_path_no_asterisk/*"
+  local hydrate_dir_full_path="$hydrate_dir_full_path/*"
 
   echo_debug "\nchecking for hydration files in: $hydrate_dir_full_path"
 
@@ -520,6 +531,8 @@ hydrate_data_in_dir() {
     esac
   done
 }
+
+###################### CMDS
 case $1 in
 init) init_vault ;;
 get_unseal_tokens) get_unseal_tokens ;;
