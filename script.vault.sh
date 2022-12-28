@@ -526,12 +526,18 @@ create)
   secret)
     case $3 in
     kv2)
-      # FYI: you should prefer the other cmd that accepts a filepath
-      # eg create secret kv2 poo/in/ur/eye '{"a": "b", "c": "d"}'
-      data="{\"data\": $5 }"
-      echo_debug "creating secret at $4 with $data"
+      echo_debug 'kv2 secrets need to be refactored'
+      # vault_post_data "$data" "$ADDR/$SECRET_DATA/$4"
+      ;;
+    kv1)
+      syntax='syntax: create secret kv1 secretPath pathToJson'
+      secret_path=${4:?$syntax}
+      payload=${5:?$syntax}
+      payload_path=$(get_payload_path $payload)
+      throw_if_file_doesnt_exist $payload_path
+      echo_debug "creating secret at $secret_path with $payload_path"
 
-      vault_post_data "$data" "$ADDR/$SECRET_DATA/$4"
+      vault_post_data "@${payload_path}" "$ADDR/$SECRET_KV1/$secret_path"
       ;;
     *) invalid_request ;;
     esac
