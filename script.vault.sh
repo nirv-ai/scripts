@@ -15,7 +15,7 @@ TOKEN_HEADER="X-Vault-Token: $TOKEN"
 # VAULT FEATURE ENABLED PATHS
 ## modify the path at which a vault feature is enabled
 ## if you change these, you will need to change the config files
-SECRET_KV1=${KV1_PATH:-env} # [GET|LIST] this/:path, POST this/:path {json}
+SECRET_KV1=${KV1_PATH:-env} # [GET|LIST|DELETE] this/:path, POST this/:path {json}
 SECRET_KV2=${KV2_PATH:-secret}
 DB=${DB_PATH:-database}
 AUTH=${AUTH_PATH:-auth}
@@ -68,7 +68,7 @@ echo_debug() {
   if [ "$DEBUG" = 1 ]; then
     echo -e '\n\n[DEBUG] SCRIPT.VAULT.SH\n------------'
     echo -e "$@"
-    echo "\n------------\n\n"
+    echo -e "------------\n\n"
   fi
 }
 
@@ -643,8 +643,12 @@ get)
     esac
     ;;
   secret)
-    # eg: get secret secret/foo
-    vault_curl_auth "$ADDR/$SECRET_KV2/$3"
+    secret_path=${4:?'syntax: get secret kv[1|2] secretPath'}
+    case $3 in
+    kv2) vault_curl_auth "$ADDR/$SECRET_KV2/$secret_path" ;;
+    kv1) vault_curl_auth "$ADDR/$SECRET_KV1/$secret_path" ;;
+    *) invalid_request ;;
+    esac
     ;;
   status)
     # eg get status
@@ -782,6 +786,14 @@ rm)
   id=${3:-''}
 
   case $rmwhat in
+  secret)
+    secret_path=${4:?'syntax: get secret kv[1|2] secretPath'}
+    case $3 in
+    kv2) vault_curl_auth "$ADDR/$SECRET_KV2/$secret_path" -X DELETE ;;
+    kv1) vault_curl_auth "$ADDR/$SECRET_KV1/$secret_path" -X DELETE ;;
+    *) invalid_request ;;
+    esac
+    ;;
   token-role)
     # -X DELETE? $AUTH/token/roles/$id
     echo_debug 'delete token role not setup'
