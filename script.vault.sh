@@ -12,22 +12,28 @@ DEBUG=${NIRV_SCRIPT_DEBUG:-''}
 # vars
 TOKEN_HEADER="X-Vault-Token: $TOKEN"
 
-# endpoints
+# VAULT FEATURE ENABLED PATHS
+## modify the path at which a vault feature is enabled
+## if you change these, you will need to change the config files
+SECRET_KV1=env # [GET|LIST|DELETE] this/:path, POST this/:path {json}
+SECRET_KV2=secret
+DB_ENGINE=database
 AUTH_APPROLE=auth/approle
+
+# endpoints
 AUTH_APPROLE_ROLE=$AUTH_APPROLE/role
 AUTH_TOKEN=auth/token
 AUTH_TOKEN_ACCESSORS=$AUTH_TOKEN/accessors
-DB=database
-DB_CONFIG=$DB/config                  # LIST this, DELETE this/:name, POST this/:name {connection}
-DB_CREDS=$DB/creds                    # GET this/:name
-DB_RESET=$DB/reset                    # POST this/:name,
-DB_ROLES=$DB/roles                    # LIST this, [GET|DELETE] this/:name, POST this/:name {config},
-DB_ROTATE=$DB/rotate-root             # POST this/:name ,
-DB_STATIC_ROLE=$DB/static-roles       # LIST this, [GET|DELETE] this/:name, POST this/:name {config}
-DB_STATIC_CREDS=$DB/static-creds      # GET this/:name,
-DB_STATIC_ROTATE=$DB/rotate-role      # POST this/:name,
-TOKEN_CREATE_CHILD=$AUTH_TOKEN/create # POST this/:rolename, POST this {config}
-TOKEN_CREATE_ROLE=$AUTH_TOKEN/roles   # POST this/:rolename {config}
+DB_CONFIG=$DB_ENGINE/config             # LIST this, DELETE this/:name, POST this/:name {connection}
+DB_CREDS=$DB_ENGINE/creds               # GET this/:name
+DB_RESET=$DB_ENGINE/reset               # POST this/:name,
+DB_ROLES=$DB_ENGINE/roles               # LIST this, [GET|DELETE] this/:name, POST this/:name {config},
+DB_ROTATE=$DB_ENGINE/rotate-root        # POST this/:name ,
+DB_STATIC_ROLE=$DB_ENGINE/static-roles  # LIST this, [GET|DELETE] this/:name, POST this/:name {config}
+DB_STATIC_CREDS=$DB_ENGINE/static-creds # GET this/:name,
+DB_STATIC_ROTATE=$DB_ENGINE/rotate-role # POST this/:name,
+TOKEN_CREATE_CHILD=$AUTH_TOKEN/create   # POST this/:rolename, POST this {config}
+TOKEN_CREATE_ROLE=$AUTH_TOKEN/roles     # POST this/:rolename {config}
 TOKEN_CREATE_ORPHAN=$AUTH_TOKEN/create-orphan
 TOKEN_INFO=$AUTH_TOKEN/lookup
 TOKEN_INFO_ACCESSOR=$AUTH_TOKEN/lookup-accessor
@@ -40,23 +46,19 @@ TOKEN_REVOKE_SELF=$AUTH_TOKEN/revoke-self
 TOKEN_REVOKE_AXOR=$AUTH_TOKEN/revoke-accessor
 TOKEN_REVOKE_PARENT=$AUTH_TOKEN/revoke-orphan # children become orphans, parent secrets revoked
 TOKEN_ROLES=$AUTH_TOKEN/roles                 # LIST this, [DELETE|POST] this/:roleId
-# the default kv1 engine is mounted at env
-SECRET_KV1=env # [GET|LIST] this/:path, POST this/:path {json}
-# the default kv2 secret is mounted at secret
-SECRET_KV2=secret
-SECRET_KV2_DATA=$SECRET_KV2/data        # GET this/:path?version=X, PATCH this/:path {json} -H Content-Type application/merge-patch+json, DELETE this/:path
-SECRET_KV2_RM=$SECRET_KV2/delete        # POST this/:path {json}
-SECRET_KV2_RM_UNDO=$SECRET_KV2/undelete # POST this/:path {json}
-SECRET_KV2_ERASE=$SECRET_KV2/destroy    # POST this:path {json}
-SECRET_KV2_CONFIG=$SECRET_KV2/config    # GET this, POST this {config}
-SECRET_KV2_SUBKEYS=$SECRET_KV2/subkeys  # GET this/:path?version=X&depth=Y
-SECRET_KV2_KEYS=$SECRET_KV2/metadata    # [GET|LIST|DELETE] this/:path, POST this/:path {json}, PATCH this/:path {json} -H Content-Type application/merge-patch+json,
+SECRET_KV2_DATA=$SECRET_KV2/data              # GET this/:path?version=X, PATCH this/:path {json} -H Content-Type application/merge-patch+json, DELETE this/:path
+SECRET_KV2_RM=$SECRET_KV2/delete              # POST this/:path {json}
+SECRET_KV2_RM_UNDO=$SECRET_KV2/undelete       # POST this/:path {json}
+SECRET_KV2_ERASE=$SECRET_KV2/destroy          # POST this:path {json}
+SECRET_KV2_CONFIG=$SECRET_KV2/config          # GET this, POST this {config}
+SECRET_KV2_SUBKEYS=$SECRET_KV2/subkeys        # GET this/:path?version=X&depth=Y
+SECRET_KV2_KEYS=$SECRET_KV2/metadata          # [GET|LIST|DELETE] this/:path, POST this/:path {json}, PATCH this/:path {json} -H Content-Type application/merge-patch+json,
 SYS_AUTH=sys/auth
 SYS_HEALTH=sys/health
 SYS_MOUNTS=sys/mounts
 SYS_LEASES=sys/leases
 SYS_LEASES_LOOKUP=$SYS_LEASES/lookup
-SYS_LEASES_LOOKUP_DB_CREDS=$SYS_LEASES_LOOKUP/database/creds
+SYS_LEASES_LOOKUP_DB_CREDS=$SYS_LEASES_LOOKUP/$DB_ENGINE/creds
 SYS_POLY=sys/policies
 SYS_POLY_ACL=$SYS_POLY/acl # PUT this/:polyName
 
@@ -65,7 +67,7 @@ echo_debug() {
   if [ "$DEBUG" = 1 ]; then
     echo -e '\n\n[DEBUG] SCRIPT.VAULT.SH\n------------'
     echo -e "$@"
-    echo '\n------------\n\n'
+    echo -e "------------\n\n"
   fi
 }
 
@@ -76,9 +78,6 @@ invalid_request() {
   echo_debug $INVALID_REQUEST_MSG
 }
 throw_if_file_doesnt_exist() {
-  # todo: if path starts with / return it
-  # todo: if path starts with . throw
-
   if test ! -f "$1"; then
     echo_debug "file doesnt exist: $1"
     exit 1
@@ -150,6 +149,9 @@ data_type_only() {
       '{ "type":$type }'
   )
   echo $data
+}
+data_data_only() {
+  echo "{ \"data\": $(cat $1 | jq)}"
 }
 data_token_only() {
   local data=$(
@@ -227,12 +229,12 @@ get_single_unseal_token() {
   )
 }
 get_unseal_tokens() {
-  echo_debug "VAULT_TOKEN:\n\n$VAULT_TOKEN\n"
-  echo_debug "UNSEAL_TOKEN(s):\n"
+  echo -e "VAULT_TOKEN:\n\n$VAULT_TOKEN\n"
+  echo -e "UNSEAL_TOKEN(s):\n"
   unseal_threshold=$(cat $JAIL/root.unseal.json | jq '.unseal_threshold')
   i=0
   while [ $i -lt $unseal_threshold ]; do
-    echo_debug "\n$(get_single_unseal_token $i)"
+    echo -e "\n$(get_single_unseal_token $i)"
     i=$((i + 1))
   done
 }
@@ -286,7 +288,10 @@ enable_something() {
 }
 ################################ workflows
 process_policies_in_dir() {
-  local policy_dir_full_path="$(pwd)/$1/*"
+  local policy_dir_full_path="$(get_payload_path $1)"
+  throw_if_dir_doesnt_exist $policy_dir_full_path
+
+  local policy_dir_full_path="$policy_dir_full_path/*"
   echo_debug "\nchecking for policies in: $policy_dir_full_path"
 
   for file_starts_with_policy_ in $policy_dir_full_path; do
@@ -299,7 +304,10 @@ process_policies_in_dir() {
   done
 }
 process_engine_configs() {
-  local engine_config_dir_full_path="$(pwd)/$1/*"
+  local engine_config_dir_full_path="$(get_payload_path $1)"
+  throw_if_dir_doesnt_exist $engine_config_dir_full_path
+
+  local engine_config_dir_full_path="$engine_config_dir_full_path/*"
   echo_debug "\nchecking for engine configuration files in: $engine_config_dir_full_path"
 
   for file_starts_with_secret_ in $engine_config_dir_full_path; do
@@ -355,7 +363,10 @@ process_engine_configs() {
   done
 }
 process_token_role_in_dir() {
-  local token_role_dir_full_path="$(pwd)/$1/*"
+  local token_role_dir_full_path="$(get_payload_path $1)"
+  throw_if_dir_doesnt_exist $token_role_dir_full_path
+
+  local token_role_dir_full_path="$token_role_dir_full_path/*"
   echo_debug "\nchecking for token roles in: $token_role_dir_full_path"
 
   for file_starts_with_token_role in $token_role_dir_full_path; do
@@ -385,7 +396,10 @@ process_token_role_in_dir() {
   done
 }
 process_tokens_in_dir() {
-  local token_dir_full_path="$(pwd)/$1/*"
+  local token_dir_full_path="$(get_payload_path $1)"
+  throw_if_dir_doesnt_exist $token_dir_full_path
+
+  local token_dir_full_path="$token_dir_full_path/*"
   echo_debug "\nchecking for token create files in: $token_dir_full_path"
 
   for file_starts_with_token_create_ in $token_dir_full_path; do
@@ -411,10 +425,8 @@ process_tokens_in_dir() {
     token_create_approle)
       echo_debug "\n$auth_scheme\n\n[ROLE_ID_FILE]: $ROLE_ID_FILE\n[SECRET_ID_FILE]: $CREDENTIAL_FILE\n"
 
-      # save role-id if it doesnt exist in $JAIL
-      if test ! -f "$ROLE_ID_FILE"; then
-        vault_curl_auth "$ADDR/$AUTH_APPROLE_ROLE/$token_type/role-id" >$ROLE_ID_FILE
-      fi
+      # save role-id
+      vault_curl_auth "$ADDR/$AUTH_APPROLE_ROLE/$token_type/role-id" >$ROLE_ID_FILE
 
       # save new secret-id for authenticating as role-id
       vault_post_no_data "$ADDR/$AUTH_APPROLE_ROLE/$token_type/secret-id" -X POST >$CREDENTIAL_FILE
@@ -430,7 +442,10 @@ process_tokens_in_dir() {
   done
 }
 process_auths_in_dir() {
-  local auth_dir_full_path="$(pwd)/$1/*"
+  local auth_dir_full_path="$(get_payload_path $1)"
+  throw_if_dir_doesnt_exist $auth_dir_full_path
+
+  local auth_dir_full_path="$auth_dir_full_path/*"
   echo_debug "\nchecking for auth configs in: $auth_dir_full_path"
 
   for file_starts_with_auth_ in $auth_dir_full_path; do
@@ -443,7 +458,10 @@ process_auths_in_dir() {
   done
 }
 enable_something_in_dir() {
-  local enable_something_full_dir="$(pwd)/$1/*"
+  local enable_something_full_dir="$(get_payload_path $1)"
+  throw_if_dir_doesnt_exist $enable_something_full_dir
+
+  local enable_something_full_dir="$enable_something_full_dir/*"
   echo_debug "\nchecking for enable.thisthing.atthispath files in:\n$enable_something_full_dir\n"
 
   for file_starts_with_enable_X in $enable_something_full_dir; do
@@ -472,10 +490,56 @@ enable_something_in_dir() {
     esac
   done
 }
+hydrate_data_in_dir() {
+  local hydrate_dir_full_path="$(get_payload_path $1)"
+  throw_if_dir_doesnt_exist $hydrate_dir_full_path
 
+  local hydrate_dir_full_path="$hydrate_dir_full_path/*"
+
+  echo_debug "\nchecking for hydration files in: $hydrate_dir_full_path"
+
+  for file_starts_with_hydrate_ in $hydrate_dir_full_path; do
+    local data_hydrate_filename=$(get_file_name $file_starts_with_hydrate_)
+
+    # configure shell to parse filename into expected components
+    PREV_IFS="$IFS"               # save prev boundary
+    IFS="."                       # hydrate_ENGINE_TYPE.ENGINE_PATH.SECRET_PATH.json
+    set -f                        # stop wildcard * expansion
+    set -- $data_hydrate_filename # break filename @ '.' into positional a rgs
+
+    # reset shell back to normal
+    set +f
+    IFS=$PREV_IFS
+
+    engine_type=${1:-''}
+    engine_path=${2:-''}
+    secret_path=${3:-''}
+
+    case $engine_type in
+    'hydrate_kv1')
+      echo_debug "\n$engine_type\n\n[ENGINE_PATH]: $engine_path\n[SECRET_PATH]: $secret_path\n"
+
+      vault_post_data "@${file_starts_with_hydrate_}" "$ADDR/$SECRET_KV1/$secret_path"
+
+      ;;
+    'hydrate_kv2')
+      echo_debug "\n$engine_type\n\n[ENGINE_PATH]: $engine_path\n[SECRET_PATH]: $secret_path\n"
+      payload_data=$(data_data_only $file_starts_with_hydrate_)
+      vault_post_data "${payload_data}" "$ADDR/$SECRET_KV2_DATA/$secret_path" >/dev/null
+      ;;
+    *) echo_debug "ignoring file with unknown format: $engine_config_filename" ;;
+    esac
+  done
+}
+
+###################### CMDS
 case $1 in
 init) init_vault ;;
 get_unseal_tokens) get_unseal_tokens ;;
+get_single_unseal_token)
+  token_index=${2-0}
+  echo -e "\n----\n\n$(get_single_unseal_token $token_index)\n\n----\n"
+  ;;
 unseal) unseal_vault ;;
 enable)
   case $2 in
@@ -495,8 +559,13 @@ list)
     echo_debug 'listing all tokens'
     vault_list $ADDR/$AUTH_TOKEN_ACCESSORS
     ;;
-  secrets)
-    vault_list "$ADDR/$SECRET_DATA/$3"
+  secret-keys)
+    syntax='syntax: list secret-keys kv[1|2] secretPath'
+    secret_path=${4:-''}
+    case $3 in
+    kv1) vault_list "$ADDR/$SECRET_KV1/$secret_path" ;;
+    kv2) vault_list "$ADDR/$SECRET_KV2/$secret_path" ;;
+    esac
     ;;
   secret-engines)
     vault_curl_auth "$ADDR/$SYS_MOUNTS"
@@ -521,17 +590,49 @@ list)
   *) invalid_request ;;
   esac
   ;;
+patch)
+  case $2 in
+  secret)
+    case $3 in
+    kv2)
+      syntax='syntax: patch secret kv2 secretPath pathToJson'
+      secret_path=${4:?$syntax}
+      payload=${5:?$syntax}
+      payload_path=$(get_payload_path $payload)
+      throw_if_file_doesnt_exist $payload_path
+      payload_data=$(data_data_only $payload_path)
+      echo_debug "patching secret at $secret_path with $payload_data"
+
+      vault_patch_data "${payload_data}" "$ADDR/$SECRET_KV2_DATA/$secret_path"
+      ;;
+    esac
+    ;;
+  esac
+  ;;
 create)
   case $2 in
   secret)
     case $3 in
     kv2)
-      # FYI: you should prefer the other cmd that accepts a filepath
-      # eg create secret kv2 poo/in/ur/eye '{"a": "b", "c": "d"}'
-      data="{\"data\": $5 }"
-      echo_debug "creating secret at $4 with $data"
+      syntax='syntax: create secret kv2 secretPath pathToJson'
+      secret_path=${4:?$syntax}
+      payload=${5:?$syntax}
+      payload_path=$(get_payload_path $payload)
+      throw_if_file_doesnt_exist $payload_path
+      payload_data=$(data_data_only $payload_path)
+      echo_debug "creating secret at $secret_path with $payload_data"
 
-      vault_post_data "$data" "$ADDR/$SECRET_DATA/$4"
+      vault_post_data "${payload_data}" "$ADDR/$SECRET_KV2_DATA/$secret_path"
+      ;;
+    kv1)
+      syntax='syntax: create secret kv1 secretPath pathToJson'
+      secret_path=${4:?$syntax}
+      payload=${5:?$syntax}
+      payload_path=$(get_payload_path $payload)
+      throw_if_file_doesnt_exist $payload_path
+      echo_debug "creating secret at $secret_path with $payload_path"
+
+      vault_post_data "@${payload_path}" "$ADDR/$SECRET_KV1/$secret_path"
       ;;
     *) invalid_request ;;
     esac
@@ -621,9 +722,17 @@ get)
     *) invalid_request ;;
     esac
     ;;
+  secret-kv2-config) vault_curl_auth "$ADDR/$SECRET_KV2_CONFIG" ;;
   secret)
-    # eg: get secret secret/foo
-    vault_curl_auth "$ADDR/$SECRET_DATA/$3"
+    secret_path=${4:?'syntax: get secret kv[1|2] secretPath'}
+    case $3 in
+    kv2)
+      version=${5:-''}
+      vault_curl_auth "$ADDR/$SECRET_KV2_DATA/$secret_path?version=$version"
+      ;;
+    kv1) vault_curl_auth "$ADDR/$SECRET_KV1/$secret_path" ;;
+    *) invalid_request ;;
+    esac
     ;;
   status)
     # eg get status
@@ -761,8 +870,16 @@ rm)
   id=${3:-''}
 
   case $rmwhat in
+  secret)
+    secret_path=${4:?'syntax: get secret kv[1|2] secretPath'}
+    case $3 in
+    kv2) vault_curl_auth "$ADDR/$SECRET_KV2/$secret_path" -X DELETE ;;
+    kv1) vault_curl_auth "$ADDR/$SECRET_KV1/$secret_path" -X DELETE ;;
+    *) invalid_request ;;
+    esac
+    ;;
   token-role)
-    # -X DELETE? auth/token/roles/$id
+    # -X DELETE? $AUTH/token/roles/$id
     echo_debug 'delete token role not setup'
     ;;
   approle-role) vault_delete "$ADDR/$AUTH_APPROLE_ROLE/${id:?'syntax: rm approle roleName'}" ;;
@@ -773,34 +890,32 @@ process)
 
   case $processwhat in
   policy_in_dir)
-    dir=${3:?'syntax: process policy_in_dir path/to/dir'}
-    throw_if_dir_doesnt_exist $dir
+    dir=${3:?'syntax: process policy_in_dir [/]path/to/dir'}
     process_policies_in_dir $dir
     ;;
   token_role_in_dir)
-    dir=${3:?'syntax: process token_role_in_dir path/to/dir'}
-    throw_if_dir_doesnt_exist $dir
+    dir=${3:?'syntax: process token_role_in_dir [/]path/to/dir'}
     process_token_role_in_dir $dir
     ;;
   auth_in_dir)
-    dir=${3:?'syntax: process auth_in_dir path/to/dir'}
-    throw_if_dir_doesnt_exist $dir
+    dir=${3:?'syntax: process auth_in_dir [/]path/to/dir'}
     process_auths_in_dir $dir
     ;;
   enable_feature)
-    dir=${3:?'syntax: process enable_feature path/to/dir'}
-    throw_if_dir_doesnt_exist $dir
+    dir=${3:?'syntax: process enable_feature [/]path/to/dir'}
     enable_something_in_dir $dir
     ;;
   engine_config)
-    dir=${3:?'syntax: process engine_config path/to/dir'}
-    throw_if_dir_doesnt_exist $dir
+    dir=${3:?'syntax: process engine_config [/]path/to/dir'}
     process_engine_configs $dir
     ;;
   token_in_dir)
-    dir=${3:?'syntax: process token_in_dir path/to/dir'}
-    throw_if_dir_doesnt_exist $dir
+    dir=${3:?'syntax: process token_in_dir [/]path/to/dir'}
     process_tokens_in_dir $dir
+    ;;
+  secret_data_in_dir)
+    dir=${3:?'syntax: process hydrate_secret_data [/]path/to/dir'}
+    hydrate_data_in_dir $dir
     ;;
   *) invalid_request ;;
   esac
