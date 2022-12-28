@@ -42,7 +42,7 @@ TOKEN_REVOKE_PARENT=$AUTH_TOKEN/revoke-orphan # children become orphans, parent 
 TOKEN_ROLES=$AUTH_TOKEN/roles                 # LIST this, [DELETE|POST] this/:roleId
 # the default kv1 engine is mounted at env
 SECRET_KV1=env # [GET|LIST] this/:path, POST this/:path {json}
-# the default kv2 secret is mounted at secret
+# the default kv2 engine is mounted at secret
 SECRET_KV2=secret
 SECRET_KV2_DATA=$SECRET_KV2/data        # GET this/:path?version=X, PATCH this/:path {json} -H Content-Type application/merge-patch+json, DELETE this/:path
 SECRET_KV2_RM=$SECRET_KV2/delete        # POST this/:path {json}
@@ -76,9 +76,6 @@ invalid_request() {
   echo_debug $INVALID_REQUEST_MSG
 }
 throw_if_file_doesnt_exist() {
-  # todo: if path starts with / return it
-  # todo: if path starts with . throw
-
   if test ! -f "$1"; then
     echo_debug "file doesnt exist: $1"
     exit 1
@@ -385,6 +382,8 @@ process_token_role_in_dir() {
   done
 }
 process_tokens_in_dir() {
+  # TODO: grep for everything like this
+  # ^ it should use get_payload_path which checks for leading / and ./
   local token_dir_full_path="$(pwd)/$1/*"
   echo_debug "\nchecking for token create files in: $token_dir_full_path"
 
@@ -412,6 +411,8 @@ process_tokens_in_dir() {
       echo_debug "\n$auth_scheme\n\n[ROLE_ID_FILE]: $ROLE_ID_FILE\n[SECRET_ID_FILE]: $CREDENTIAL_FILE\n"
 
       # save role-id if it doesnt exist in $JAIL
+      # TODO: remove this check, as it makes us have to remember
+      # ^ to delete the role_id_file if we reset vault to a green state
       if test ! -f "$ROLE_ID_FILE"; then
         vault_curl_auth "$ADDR/$AUTH_APPROLE_ROLE/$token_type/role-id" >$ROLE_ID_FILE
       fi
