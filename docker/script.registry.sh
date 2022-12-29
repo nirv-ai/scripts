@@ -104,8 +104,8 @@ tag_image() {
     echo "image taged: $taggedImage"
     docker tag $thisImage $taggedImage
     push_img $taggedImage
-    echo "removing (ignore if fail) original image and keeping new tagged image"
-    docker image remove -f $thisImage || true
+    # echo "removing (ignore if fail) original image and keeping new tagged image"
+    # docker image remove -f $thisImage || true
     ;;
   esac
 
@@ -116,7 +116,7 @@ tag_running_containers() {
   echo "$(docker ps --format '{{json .}}' | jq '.Image')"
   # echo $(docker inspect nirvai_core_ui | jq '.[] | {sha: .Image, name: .Name}')
 
-  # haha got lucky on this one, docker format has 0 documentation
+  # haha got lucky on this one
   docker ps --format '{{json .}}' | jq '.Image' | while IFS= read -r cunt; do
     echo
     echo "processing cunt: $cunt"

@@ -10,6 +10,8 @@ NOMAD_CACERT="${NOMAD_CACERT:-./tls/nomad-ca.pem}"
 NOMAD_CLIENT_CERT="${NOMAD_CLIENT_CERT:-./tls/cli.pem}"
 NOMAD_CLIENT_KEY="${NOMAD_CLIENT_KEY:-./tls/cli-key.pem}"
 
+NOMAD_CMD_ARGS="-ca-cert=$NOMAD_CACERT -client-cert=$NOMAD_CLIENT_CERT -client-key=$NOMAD_CLIENT_KEY -address=$NOMAD_ADDR"
+
 DEBUG=${NIRV_SCRIPT_DEBUG:-''}
 
 nmd() {
@@ -33,7 +35,7 @@ nmd() {
     done
   fi
 
-  # tls options should be specified in configs
+  # s = server, c = client
   case $1 in
   s | c)
     what=$(test "$1" = 'c' && echo 'client' || echo 'server')
@@ -43,52 +45,32 @@ nmd() {
     ;;
   esac
 
-  # @see https://askubuntu.com/questions/750419/how-do-i-run-a-sudo-command-needing-password-input-in-the-background
-  # cant use `cmd poop &` instead use sudo -b
-  # we also need to specificly set where the TLS options go
+  # we need to specificly where the TLS options go
   # dont rely on environment vars to be set because we run with set -u
-  # tls defaults to dev.nirv.ai configuration in ./tls dir
+  # TODO: remove these once everything is working
   echo
-  echo -e "using tls options"
-  echo -e "NOMAD_ADDR: $NOMAD_ADDR"
-  echo -e "NOMAD_CACERT: $NOMAD_CACERT"
-  echo -e "NOMAD_CLIENT_CERT: $NOMAD_CLIENT_CERT"
-  echo -e "NOMAD_CLIENT_KEY: $NOMAD_CLIENT_KEY"
-  echo ""
+  echo -e "using tls options: $NOMAD_CMD_ARGS\n"
 
   case $1 in
   plan | status)
     echo
     echo -e "executing: sudo nomad $1 [tls-options] ${@:2}"
-    sudo nomad "$1" \
-      -ca-cert="$NOMAD_CACERT" \
-      -client-cert="$NOMAD_CLIENT_CERT" \
-      -client-key="$NOMAD_CLIENT_KEY" \
-      -address="$NOMAD_ADDR" \
-      "${@:2}"
+    sudo nomad "$1" $NOMAD_CMD_ARGS "${@:2}"
     ;;
   job | node | alloc | system)
     case $2 in
     run | status | logs | run | stop | gc)
       echo -e "executing: sudo nomad $1 $2 [tls-options] ${@:3}"
       echo
-      sudo nomad "$1" "$2" \
-        -ca-cert=$NOMAD_CACERT \
-        -client-cert=$NOMAD_CLIENT_CERT \
-        -client-key=$NOMAD_CLIENT_KEY \
-        -address=$NOMAD_ADDR \
-        "${@:3}"
+      sudo nomad "$1" "$2" $NOMAD_CMD_ARGS "${@:3}"
       ;;
-    *) echo -e "cmd not setup for nmd: $@ " ;;
+    *) echo -e "cmd not setup for script.nmd.sh: $@ " ;;
     esac
     ;;
   *)
+    # catch all: nomad expects TNOMAD_CMD_ARGS to come after nomad CMD ...
     echo -e "executing: sudo nomad $@ [tls-options]"
-    sudo nomad "$@" \
-      -ca-cert=$NOMAD_CACERT \
-      -client-cert=$NOMAD_CLIENT_CERT \
-      -client-key=$NOMAD_CLIENT_KEY \
-      -address=$NOMAD_ADDR
+    sudo nomad "$@" $NOMAD_CMD_ARGS
     ;;
   esac
 
