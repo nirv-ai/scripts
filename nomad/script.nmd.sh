@@ -35,17 +35,12 @@ nmd() {
     done
   fi
 
-  # s = server, c = client
   case $1 in
-  s | c)
+  s | c) # s = server, c = client
     what=$(test "$1" = 'c' && echo 'client' || echo 'server')
     echo -e "starting $what: sudo -b nomad agent ${@:2}"
     sudo -b nomad agent "${@:2}"
-    exit 0
     ;;
-  esac
-
-  case $1 in
   plan | status)
     echo
     echo -e "executing: sudo nomad $1 [tls-options] ${@:2}"
@@ -67,7 +62,6 @@ nmd() {
     sudo nomad "$@" $NOMAD_CMD_ARGS
     ;;
   esac
-
 }
 
 ENV=${ENV:-development}
