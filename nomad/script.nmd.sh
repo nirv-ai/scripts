@@ -45,12 +45,6 @@ nmd() {
     ;;
   esac
 
-  # we need to specificly where the TLS options go
-  # dont rely on environment vars to be set because we run with set -u
-  # TODO: remove these once everything is working
-  echo
-  echo -e "using tls options: $NOMAD_CMD_ARGS\n"
-
   case $1 in
   plan | status)
     echo
