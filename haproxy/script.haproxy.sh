@@ -13,11 +13,12 @@ conf)
   action=${2:-''}
   case $action in
   validate)
-    docker exec --workdir /usr/local/etc/haproxy -it nirvai_core_proxy haproxy -c -f haproxy.cfg
+    cunt_name=${3-?'syntax: conf validate SERVICE_NAME'}
+    docker exec --workdir /usr/local/etc/haproxy -it ${PREFIX}${cunt_name} haproxy -c -f haproxy.cfg
     ;;
   reload)
-    echo -e not setup
-    # docker kill -s HUP my-running-haproxy
+    cunt_name=${3-?'syntax: conf reload SERVICE_NAME'}
+    docker kill -s HUP ${PREFIX}${cunt_name}
     ;;
   *) echo -e $cmdhelp ;;
   esac
