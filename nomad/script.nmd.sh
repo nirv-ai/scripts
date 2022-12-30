@@ -35,23 +35,12 @@ nmd() {
     done
   fi
 
-  # s = server, c = client
   case $1 in
-  s | c)
+  s | c) # s = server, c = client
     what=$(test "$1" = 'c' && echo 'client' || echo 'server')
     echo -e "starting $what: sudo -b nomad agent ${@:2}"
     sudo -b nomad agent "${@:2}"
-    exit 0
     ;;
-  esac
-
-  # we need to specificly where the TLS options go
-  # dont rely on environment vars to be set because we run with set -u
-  # TODO: remove these once everything is working
-  echo
-  echo -e "using tls options: $NOMAD_CMD_ARGS\n"
-
-  case $1 in
   plan | status)
     echo
     echo -e "executing: sudo nomad $1 [tls-options] ${@:2}"
@@ -73,7 +62,6 @@ nmd() {
     sudo nomad "$@" $NOMAD_CMD_ARGS
     ;;
   esac
-
 }
 
 ENV=${ENV:-development}
