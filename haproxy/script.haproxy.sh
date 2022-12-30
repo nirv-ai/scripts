@@ -34,7 +34,7 @@ conf)
     conf_validate $cunt_name
     ;;
   info)
-    cunt_name=${3-?'syntax: conf validate SERVICE_NAME'}
+    cunt_name=${3-?'syntax: conf info SERVICE_NAME'}
     conf_info $cunt_name
     ;;
   reload)
