@@ -688,7 +688,7 @@ get)
     case $getwhat in
     self)
       echo_debug 'running credit check...'
-      vault_curl_auth $ADDR/$TOKEN_INFO
+      vault_curl_auth $ADDR/$TOKEN_INFO_SELF
       ;;
     info)
       if test -v $id; then
