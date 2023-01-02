@@ -123,18 +123,19 @@ get)
       exit 1
     fi
     case $3 in
-    team)
-      echo -e "retrieving [server] members"
+    servers)
+      echo -e "retrieving server(s) status"
       nmd server members -detailed
       ;;
-    node)
+    clients)
       nodeid=${4:-''}
       if [[ -z $nodeid ]]; then
-        echo -e 'getting verbose server status'
+        echo -e 'retrieving client(s) status'
         nmd node status -verbose
         exit 0
       fi
-      echo -e "getting verbose status for node $nodeid"
+      # $nodeid can be -self
+      echo -e "retrieving status for client $nodeid"
       nmd node status -verbose $nodeid
       ;;
     all) nmd status ;;
