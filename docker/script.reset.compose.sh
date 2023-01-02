@@ -12,9 +12,10 @@ dk_ps() {
   docker ps --no-trunc -a --format 'table {{.Names}}\n\t{{.Image}}\n\t{{.Status}}\n\t{{.Command}}\n\n' | tac
 }
 
-SERVICE_PREFIX=${SERVICE_PREFIX:-nirvai}
-POSTGRES_VOL_NAME=${SERVICE_PREFIX}_core_postgres
-ENV=${NODE_ENV:-development}
+SERVICE_PREFIX=${SERVICE_PREFIX:-'nirvai_'}
+POSTGRES_HOSTNAME=${POSTGRES_HOSTNAME:-'web_postgres'}
+POSTGRES_VOL_NAME="${SERVICE_PREFIX}${POSTGRES_HOSTNAME}"
+ENV=${ENV:-development}
 
 create_volumes() {
   docker volume create $POSTGRES_VOL_NAME || true
@@ -39,7 +40,7 @@ logs)
     echo -e "syntax: logs appname"
     exit 1
   fi
-  cname="${SERVICE_PREFIX}_${name}"
+  cname="${SERVICE_PREFIX}${name}"
   ## docker inspect --format="{{.Id}}" some_container_name
   id=$(docker inspect --format="{{.Id}}" $cname)
   if [[ -z $id ]]; then
@@ -56,10 +57,10 @@ volumes)
   ;;
 core*)
   echo "resetting infrastructore for $1"
-  if ! docker container kill ${SERVICE_PREFIX}_${1}; then
+  if ! docker container kill ${SERVICE_PREFIX}${1}; then
     echo "container for service $1 already dead"
   else
-    docker container rm ${SERVICE_PREFIX}_${1}
+    docker container rm ${SERVICE_PREFIX}${1}
   fi
   docker container prune -f
   docker volume prune

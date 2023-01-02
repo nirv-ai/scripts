@@ -2,7 +2,7 @@
 
 set -eu
 
-SERVICE_PREFIX=${SERVICE_PREFIX:-nirvai}
+SERVICE_PREFIX=${SERVICE_PREFIX:-'nirvai_'}
 
 exec_into_container() {
   cunt_name=${1:?'container name required for docker exec'}
@@ -19,5 +19,5 @@ exec_into_container() {
 cunt_name=${1:?'syntax cunt containerName | serviceName'}
 case $cunt_name in
 cunt) exec_into_container ${2:?'syntax: cunt containerName'} ;;
-*) exec_into_container ${SERVICE_PREFIX}_${cunt_name} ;;
+*) exec_into_container ${SERVICE_PREFIX}${cunt_name} ;;
 esac
