@@ -9,6 +9,9 @@ ADDR="${VAULT_ADDR:?VAULT_ADDR not set: exiting}/v1"
 TOKEN="${VAULT_TOKEN:?VAULT_TOKEN not set: exiting}"
 DEBUG=${NIRV_SCRIPT_DEBUG:-''}
 VAULT_INSTANCE_SRC_DIR="${VAULT_INSTANCE_SRC_DIR:-''}"
+UNSEAL_TOKENS="${ROOT_TOKEN:-$JAIL/tokens/root/unseal_tokens.json}"
+ROOT_PGP_KEY="${ROOT_PGP_KEY:-$JAIL/tokens/root/root.asc}"
+ADMIN_PGP_KEY_DIR="${ADMIN_PGP_KEY_DIR:-$JAIL/tokens/admin}"
 
 # vars
 TOKEN_HEADER="X-Vault-Token: $TOKEN"
@@ -213,14 +216,13 @@ data_policy_only() {
 ## -t=key-threshold (# of key shares required to unseal)
 ## TODO: we should NOT Be using the vault cli for anything in this file
 init_vault() {
-  PGP_KEYS="$JAIL/tokens/root/root.asc"
-  ADMIN_PGP_KEY_DIR="$JAIL/tokens/admin"
+  local PGP_KEYS="$ROOT_PGP_KEY"
 
   throw_if_file_doesnt_exist $PGP_KEYS
   throw_if_dir_doesnt_exist $ADMIN_PGP_KEY_DIR
 
-  KEY_SHARES=1
-  THRESHOLD=${1:-2}
+  local KEY_SHARES=1
+  local THRESHOLD=${1:-2}
 
   for pgpkey_ends_with_asc in $ADMIN_PGP_KEY_DIR/*.asc; do
     PGP_KEYS="${PGP_KEYS},$pgpkey_ends_with_asc"
@@ -237,12 +239,12 @@ init_vault() {
     -format="json" \
     -n=$KEY_SHARES \
     -t=$THRESHOLD \
-    -root-token-pgp-key="$JAIL/tokens/root/root.asc" \
+    -root-token-pgp-key="$ROOT_PGP_KEY" \
     -pgp-keys="$PGP_KEYS" >$JAIL/tokens/root/unseal_tokens.json
 }
 get_single_unseal_token() {
   echo $(
-    cat $JAIL/root.unseal.json |
+    cat $UNSEAL_TOKENS |
       jq -r ".unseal_keys_b64[$1]" |
       base64 --decode |
       gpg -dq
@@ -251,7 +253,7 @@ get_single_unseal_token() {
 get_unseal_tokens() {
   echo -e "VAULT_TOKEN:\n\n$VAULT_TOKEN\n"
   echo -e "UNSEAL_TOKEN(s):\n"
-  unseal_threshold=$(cat $JAIL/root.unseal.json | jq '.unseal_threshold')
+  unseal_threshold=$(cat $UNSEAL_TOKENS | jq '.unseal_threshold')
   i=0
   while [ $i -lt $unseal_threshold ]; do
     echo -e "\n$(get_single_unseal_token $i)"
@@ -259,7 +261,7 @@ get_unseal_tokens() {
   done
 }
 unseal_vault() {
-  unseal_threshold=$(cat $JAIL/root.unseal.json | jq '.unseal_threshold')
+  unseal_threshold=$(cat $UNSEAL_TOKENS | jq '.unseal_threshold')
   i=0
   while [ $i -lt $unseal_threshold ]; do
     vault operator unseal $(get_single_unseal_token $i)
