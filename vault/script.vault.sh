@@ -8,6 +8,7 @@ set -euo pipefail
 ADDR="${VAULT_ADDR:?VAULT_ADDR not set: exiting}/v1"
 TOKEN="${VAULT_TOKEN:?VAULT_TOKEN not set: exiting}"
 DEBUG=${NIRV_SCRIPT_DEBUG:-''}
+VAULT_INSTANCE_SRC_DIR="${VAULT_INSTANCE_SRC_DIR:-''}"
 
 # vars
 TOKEN_HEADER="X-Vault-Token: $TOKEN"
@@ -210,15 +211,34 @@ data_policy_only() {
 ## single executions
 ## -n=key-shares
 ## -t=key-threshold (# of key shares required to unseal)
+## TODO: we should NOT Be using the vault cli for anything in this file
 init_vault() {
-  # TODO: we should NOT Be using the vault cli for anything in this file
+  PGP_KEYS="$JAIL/tokens/root/root.asc"
+  ADMIN_PGP_KEY_DIR="$JAIL/tokens/admin"
+
+  throw_if_file_doesnt_exist $PGP_KEYS
+  throw_if_dir_doesnt_exist $ADMIN_PGP_KEY_DIR
+
+  KEY_SHARES=1
+  THRESHOLD=${1:-2}
+
+  for pgpkey_ends_with_asc in $ADMIN_PGP_KEY_DIR/*.asc; do
+    PGP_KEYS="${PGP_KEYS},$pgpkey_ends_with_asc"
+    KEY_SHARES=$((KEY_SHARES + 1))
+  done
+
+  if test $KEY_SHARES -lt $THRESHOLD; then
+    echo "you need atleast $THRESHOLD tokens: $KEY_SHARES found"
+    exit 1
+  fi
+
   echo_debug 'this may take some time...'
   vault operator init \
     -format="json" \
-    -n=2 \
-    -t=2 \
-    -root-token-pgp-key="$JAIL/root.asc" \
-    -pgp-keys="$JAIL/root.asc,$JAIL/admin_vault.asc" >$JAIL/root.unseal.json
+    -n=$KEY_SHARES \
+    -t=$THRESHOLD \
+    -root-token-pgp-key="$JAIL/tokens/root/root.asc" \
+    -pgp-keys="$PGP_KEYS" >$JAIL/tokens/root/unseal_tokens.json
 }
 get_single_unseal_token() {
   echo $(
@@ -288,7 +308,7 @@ enable_something() {
 }
 ################################ workflows
 process_policies_in_dir() {
-  local policy_dir_full_path="$(get_payload_path $1)"
+  local policy_dir_full_path="$VAULT_INSTANCE_SRC_DIR/config"
   throw_if_dir_doesnt_exist $policy_dir_full_path
 
   local policy_dir_full_path="$policy_dir_full_path/*"
@@ -304,7 +324,7 @@ process_policies_in_dir() {
   done
 }
 process_engine_configs() {
-  local engine_config_dir_full_path="$(get_payload_path $1)"
+  local engine_config_dir_full_path="$VAULT_INSTANCE_SRC_DIR/config"
   throw_if_dir_doesnt_exist $engine_config_dir_full_path
 
   local engine_config_dir_full_path="$engine_config_dir_full_path/*"
@@ -363,7 +383,7 @@ process_engine_configs() {
   done
 }
 process_token_role_in_dir() {
-  local token_role_dir_full_path="$(get_payload_path $1)"
+  local token_role_dir_full_path="$VAULT_INSTANCE_SRC_DIR/config"
   throw_if_dir_doesnt_exist $token_role_dir_full_path
 
   local token_role_dir_full_path="$token_role_dir_full_path/*"
@@ -396,7 +416,7 @@ process_token_role_in_dir() {
   done
 }
 process_tokens_in_dir() {
-  local token_dir_full_path="$(get_payload_path $1)"
+  local token_dir_full_path="$VAULT_INSTANCE_SRC_DIR/config"
   throw_if_dir_doesnt_exist $token_dir_full_path
 
   local token_dir_full_path="$token_dir_full_path/*"
@@ -442,7 +462,7 @@ process_tokens_in_dir() {
   done
 }
 process_auths_in_dir() {
-  local auth_dir_full_path="$(get_payload_path $1)"
+  local auth_dir_full_path="$VAULT_INSTANCE_SRC_DIR/config"
   throw_if_dir_doesnt_exist $auth_dir_full_path
 
   local auth_dir_full_path="$auth_dir_full_path/*"
@@ -490,8 +510,8 @@ enable_something_in_dir() {
     esac
   done
 }
-hydrate_data_in_dir() {
-  local hydrate_dir_full_path="$(get_payload_path $1)"
+process_secret_data_in_dir() {
+  local hydrate_dir_full_path="$VAULT_INSTANCE_SRC_DIR/config"
   throw_if_dir_doesnt_exist $hydrate_dir_full_path
 
   local hydrate_dir_full_path="$hydrate_dir_full_path/*"
@@ -534,7 +554,7 @@ hydrate_data_in_dir() {
 
 ###################### CMDS
 case $1 in
-init) init_vault ;;
+init) init_vault ${2:-2} ;;
 get_unseal_tokens) get_unseal_tokens ;;
 get_single_unseal_token)
   token_index=${2-0}
@@ -889,34 +909,15 @@ process)
   processwhat=${2:-''}
 
   case $processwhat in
-  policy_in_dir)
-    dir=${3:?'syntax: process policy_in_dir [/]path/to/dir'}
-    process_policies_in_dir $dir
-    ;;
-  token_role_in_dir)
-    dir=${3:?'syntax: process token_role_in_dir [/]path/to/dir'}
-    process_token_role_in_dir $dir
-    ;;
-  auth_in_dir)
-    dir=${3:?'syntax: process auth_in_dir [/]path/to/dir'}
-    process_auths_in_dir $dir
-    ;;
-  enable_feature)
-    dir=${3:?'syntax: process enable_feature [/]path/to/dir'}
-    enable_something_in_dir $dir
-    ;;
-  engine_config)
-    dir=${3:?'syntax: process engine_config [/]path/to/dir'}
-    process_engine_configs $dir
-    ;;
-  token_in_dir)
-    dir=${3:?'syntax: process token_in_dir [/]path/to/dir'}
-    process_tokens_in_dir $dir
-    ;;
-  secret_data_in_dir)
-    dir=${3:?'syntax: process hydrate_secret_data [/]path/to/dir'}
-    hydrate_data_in_dir $dir
-    ;;
+  # this is the init order
+  vault_admin) process_vault_admins_in_dir ;;
+  policy) process_policies_in_dir ;;
+  token_role) process_token_role_in_dir ;;
+  enable_feature) enable_something_in_dir ;;
+  auth) process_auths_in_dir ;;
+  secret_engine) process_engine_configs ;;
+  token) process_tokens_in_dir ;;
+  secret_data) process_secret_data_in_dir ;;
   *) invalid_request ;;
   esac
   ;;
