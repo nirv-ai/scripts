@@ -398,36 +398,31 @@ process_engine_configs() {
   done
 }
 process_token_role_in_dir() {
-  local token_role_dir_full_path="$VAULT_INSTANCE_SRC_DIR/config"
-  throw_if_dir_doesnt_exist $token_role_dir_full_path
+  throw_if_dir_doesnt_exist $VAULT_INSTANCE_CONFIG_DIR
 
-  local token_role_dir_full_path="$token_role_dir_full_path/*"
-  echo_debug "\nchecking for token roles in: $token_role_dir_full_path"
+  for token_role in $VAULT_INSTANCE_CONFIG_DIR/*/token-role/token_role*.json; do
+    test -f $token_role || break
+    echo_debug "creating token_role: $token_role"
 
-  for file_starts_with_token_role in $token_role_dir_full_path; do
-    case $file_starts_with_token_role in
-    *"/token_role"*)
-      local token_role_filename=$(get_file_name $file_starts_with_token_role)
+    local token_role_filename=$(get_file_name $token_role)
 
-      # configure shell to parse filename into expected components
-      PREV_IFS="$IFS"             # save prev boundary
-      IFS="."                     # enable.thisThing.atThisPath
-      set -f                      # stop wildcard * expansion
-      set -- $token_role_filename # break filename @ '.' into positional args
+    # configure shell to parse filename into expected components
+    PREV_IFS="$IFS"             # save prev boundary
+    IFS="."                     # enable.thisThing.atThisPath
+    set -f                      # stop wildcard * expansion
+    set -- $token_role_filename # break filename @ '.' into positional args
 
-      # reset shell back to normal
-      set +f
-      IFS=$PREV_IFS
+    # reset shell back to normal
+    set +f
+    IFS=$PREV_IFS
 
-      # make request if 2 is set, but 3 isnt
-      if test -n ${2:-''} && test -n ${3:-''} && test -z ${4:-''}; then
-        vault_post_data "@${file_starts_with_token_role}" "$ADDR/$TOKEN_CREATE_ROLE/${2}"
-      else
-        echo_debug "ignoring file\ndidnt match expectations: $token_role_filename"
-        echo_debug 'filename syntax: ^token_role.ROLE_NAME$\n'
-      fi
-      ;;
-    esac
+    # make request if 2 is set, but 3 isnt
+    if test -n ${2:-''} && test -n ${3:-''} && test -z ${4:-''}; then
+      vault_post_data "@${token_role}" "$ADDR/$TOKEN_CREATE_ROLE/${2}"
+    else
+      echo_debug "ignoring file\ndidnt match expectations: $token_role_filename"
+      echo_debug 'filename syntax: ^token_role.ROLE_NAME$\n'
+    fi
   done
 }
 process_tokens_in_dir() {
