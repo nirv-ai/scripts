@@ -329,19 +329,13 @@ process_vault_admins_in_dir() {
 }
 
 process_policies_in_dir() {
-  local policy_dir_full_path="$VAULT_INSTANCE_SRC_DIR/config"
-  throw_if_dir_doesnt_exist $policy_dir_full_path
+  throw_if_dir_doesnt_exist $VAULT_INSTANCE_CONFIG_DIR
 
-  local policy_dir_full_path="$policy_dir_full_path/*"
-  echo_debug "\nchecking for policies in: $policy_dir_full_path"
+  for policy in $VAULT_INSTANCE_CONFIG_DIR/*/policy/policy_*.hcl; do
+    test -f $policy || break
 
-  for file_starts_with_policy_ in $policy_dir_full_path; do
-    case $file_starts_with_policy_ in
-    *"/policy_"*)
-      echo_debug "\nprocessing policy: $file_starts_with_policy_\n"
-      create_policy $file_starts_with_policy_
-      ;;
-    esac
+    echo_debug "creating policy: $policy"
+    create_policy $policy
   done
 }
 process_engine_configs() {
