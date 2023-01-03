@@ -1,13 +1,33 @@
 #!/usr/bin/env sh
 
-set -euo pipefail
+set -eu
 
-SERVICE_PREFIX=${SERVICE_PREFIX:-'nirvai_'}
+NAME_PREFIX=${CUNT_NAME_PREFIX:-'nirvai_'}
 
-exec_into_container() {
-  cunt_name=${1:?'container name required for docker exec'}
+get_cunt_name() {
+  container_id=$(docker ps -aqf "name=^${1}$")
+
+  if test ${#container_id} -gt 6; then
+    echo $1
+  else
+    container_name_with_prefix="${NAME_PREFIX}${1}"
+    container_id=$(docker ps -aqf "name=^${container_name_with_prefix}$")
+    if test ${#container_id} -gt 6; then
+      echo $container_name_with_prefix
+    fi
+  fi
 
   echo
+}
+
+exec_into_container() {
+  cunt_name=$(get_cunt_name $1)
+
+  if test -z "$cunt_name"; then
+    echo -e "couldnt find container with name $1 or ${NAME_PREFIX}${1}"
+    exit 1
+  fi
+
   echo "trying to exec with bash: $cunt_name\n"
   if ! docker exec -it "$cunt_name" bash; then
     echo
@@ -16,8 +36,7 @@ exec_into_container() {
   fi
 }
 
-cunt_name=${1:?'syntax cunt containerName | serviceName'}
+cunt_name=${1:?'container name is required'}
 case $cunt_name in
-cunt) exec_into_container ${2:?'syntax: cunt containerName'} ;;
-*) exec_into_container ${SERVICE_PREFIX}${cunt_name} ;;
+*) exec_into_container ${cunt_name} ;;
 esac
