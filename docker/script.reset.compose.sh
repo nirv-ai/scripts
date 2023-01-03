@@ -7,81 +7,51 @@
 
 set -euo pipefail
 
-NAME_PREFIX=${CUNT_NAME_PREFIX:-'nirvai_'}
-POSTGRES_HOSTNAME=${POSTGRES_HOSTNAME:-'web_postgres'}
-POSTGRES_VOL_NAME="${NAME_PREFIX}${POSTGRES_HOSTNAME}"
 ENV=${ENV:-development}
 
 dk_ps() {
   docker ps --no-trunc -a --format 'table {{.Names}}\n\t{{.Image}}\n\t{{.Status}}\n\t{{.Command}}\n\n' | tac
 }
 
-get_cunt_id() {
-  container_id=$(docker ps --no-trunc -aqf "name=^${1}$")
-
-  if test ${#container_id} -gt 6; then
-    echo $container_id
-  else
-    container_name_with_prefix="${NAME_PREFIX}${1}"
-    container_id=$(docker ps --no-trunc -aqf "name=^${container_name_with_prefix}$")
-    if test ${#container_id} -gt 6; then
-      echo $container_id
-    fi
+down() {
+  down_flags='--rmi all --volumes'
+  service_name=${1:-''}
+  if test -n "$service_name"; then
+    down_flags="$up_flags $service_name"
   fi
-
-  echo ""
+  docker compose down $down_flags
 }
-
-create_volumes() {
-  docker volume create $POSTGRES_VOL_NAME || true
-}
-
-build() {
-  docker compose build --no-cache --progress=plain
-}
-
 up() {
-  docker compose up -d --remove-orphans
+  up_flags='-d --build --force-recreate'
+  service_name=${1:-''}
+  if test -n "$service_name"; then
+    up_flags="$up_flags $service_name"
+  fi
+
+  dk_ps
+
+  echo -e "forcing .env.${ENV}.compose.[yaml, json] in current dir"
+  docker compose convert | yq -r -o=json >.env.${ENV}.compose.json
+  docker compose convert >.env.${ENV}.compose.yaml
+
+  docker compose up $up_flags
 }
 
-echo -e "running reset"
+# redundant: the env file is persisted to disk
+# docker compose config
 
-docker compose config
-
-case $1 in
-volumes)
-  create_volumes
-  docker volume ls
-  ;;
-core*)
-  echo "resetting infrastructore for $1"
-  if ! docker container kill ${NAME_PREFIX}${1}; then
-    echo "container for service $1 already dead"
-  else
-    docker container rm ${NAME_PREFIX}${1}
-  fi
-  docker container prune -f
-  docker volume prune
-  create_volumes
-  echo "restarting server $1"
-  docker compose build --no-cache $1
-  docker compose up -d $1 --remove-orphans
-  ;;
-*)
-  echo -e 'resetting infrastructure'
-  docker compose down
-  docker stop $(docker ps -a -q) || true
-  docker rm $(docker ps -a -q) || true
-  docker system prune -a || true
-  docker volume prune || true
-  create_volumes
-  build
+cmd=${1:-'all'}
+case $cmd in
+all)
+  echo -e 'resetting compose infrastructure'
+  down
   up
   ;;
+*)
+  service_name=${1:?'compose service name is required'}
+
+  echo "restarting compose service $service_name"
+  docker compose rm -f --stop --volumes $service_name || true
+  up $service_name
+  ;;
 esac
-
-dk_ps
-
-echo -e "forcing .env.${ENV}.compose.[yaml, json] in current dir"
-docker compose convert | yq -r -o=json >.env.${ENV}.compose.json
-docker compose convert >.env.${ENV}.compose.yaml
