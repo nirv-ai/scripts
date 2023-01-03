@@ -2,24 +2,24 @@
 
 set -eu
 
-SERVICE_PREFIX=${SERVICE_PREFIX:-nirvai}
+SERVICE_PREFIX=${SERVICE_PREFIX:-'nirvai_'}
 PROXY_WORK_DIR=${PROXY_WORK_DIR:-/usr/local/etc/haproxy}
 HAPROXY_CONFIG_DIR=${HAPROXY_CONFIG_DIR:-./configs}
 cmdhelp='invalid cmd: @see https://github.com/nirv-ai/docs/tree/main/scripts'
 
 conf_validate() {
-  echo $(docker exec --workdir $PROXY_WORK_DIR -it "${SERVICE_PREFIX}_${1}" haproxy -c -f "$HAPROXY_CONFIG_DIR")
+  echo $(docker exec --workdir $PROXY_WORK_DIR -it "${SERVICE_PREFIX}${1}" haproxy -c -f "$HAPROXY_CONFIG_DIR")
 }
 
 conf_info() {
-  docker exec --workdir $PROXY_WORK_DIR -it "${SERVICE_PREFIX}_${1}" haproxy -vv
+  docker exec --workdir $PROXY_WORK_DIR -it "${SERVICE_PREFIX}${1}" haproxy -vv
 }
 
 conf_reload() {
   is_valid=$(conf_validate "$1")
 
   case $is_valid in
-  "Configuration file is valid"*) docker kill -s HUP "${SERVICE_PREFIX}_${1}" ;;
+  "Configuration file is valid"*) docker kill -s HUP "${SERVICE_PREFIX}${1}" ;;
   *) echo "\nnot reloading:\n$is_valid\n" ;;
   esac
 }

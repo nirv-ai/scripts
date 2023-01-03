@@ -2,11 +2,10 @@
 
 # TODO: https://github.com/docker/docs/blob/main/registry/deploying.md#restricting-access
 
-set -eu
+set -euo pipefail
 
 # required
-## e.g. export REG_CERTS_PATH=apps/nirvai-core-letsencrypt/dev-nirv-ai
-REG_CERTS_PATH=${REG_CERTS_PATH:-apps/nirvai-core-letsencrypt/dev-nirv-ai}
+REG_CERTS_PATH=${REG_CERTS_PATH:-'/etc/ssl/certs'}
 
 # optional
 REG_DOMAIN=${REG_DOMAIN:-nirv.ai}
@@ -40,7 +39,7 @@ push_img() {
 run_reg() {
   volumes
 
-  real_certs_path="$(pwd)/$REG_CERTS_PATH"
+  real_certs_path="$REG_CERTS_PATH"
   if ! test -d "$real_certs_path"; then
     echo
     echo "$real_certs_path not found"
@@ -49,7 +48,7 @@ run_reg() {
 
   portmap="$REG_HOST_PORT:443"
   CUNT_CERT_PATH=/etc/ssl/certs
-  CUNT_LIVE_CERT_PATH=$CUNT_CERT_PATH/live/$REG_HOST_NAME
+  CUNT_LIVE_CERT_PATH=$CUNT_CERT_PATH/$REG_HOST_NAME
 
   echo
   echo "creating registry: $REG_NAME on $portmap"
@@ -115,7 +114,7 @@ tag_image() {
 tag_running_containers() {
   echo 'tagging & pushing images for running containers:'
   echo "$(docker ps --format '{{json .}}' | jq '.Image')"
-  # echo $(docker inspect nirvai_core_ui | jq '.[] | {sha: .Image, name: .Name}')
+  # echo $(docker inspect nirvai_web_ui | jq '.[] | {sha: .Image, name: .Name}')
 
   # haha got lucky on this one
   docker ps --format '{{json .}}' | jq '.Image' | while IFS= read -r cunt; do

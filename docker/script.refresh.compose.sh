@@ -1,48 +1,41 @@
 #!/usr/bin/env bash
 
-set -e
+set -euo pipefail
 
-###########################
-# refreshes a container
-# for something more destructive, use reset script
-###########################
-
-# @see bookOfNoah
 dk_ps() {
   docker ps --no-trunc -a --format 'table {{.Names}}\n\t{{.Image}}\n\t{{.Status}}\n\t{{.Command}}\n\n' | tac
 }
 
-SERVICE_PREFIX=${SERVICE_PREFIX:-nirvai}
-ENV=${NODE_ENV:-development}
+ENV=${ENV:-development}
 
-echo 'inside'
-echo
-echo
+save_canonical_compose_config() {
+  dk_ps
 
-if [ "$#" -eq 0 ]; then
-  echo "restarting all containers"
-  docker compose down
-  docker compose up --force-recreate --build -d
-elif [ "$1" == "rebuild" ]; then
-  echo "rebuilding and restarting containers"
-  docker compose down
-  docker compose build --no-cache
-  docker compose up --force-recreate -d
-else
-  echo "restarting $1"
-  docker container stop "${SERVICE_PREFIX}_${1}" || true
+  echo -e "\nforcing .env.${ENV}.compose.[yaml, json] in current dir"
+  docker compose convert | yq -r -o=json >.env.${ENV}.compose.json
+  docker compose convert >.env.${ENV}.compose.yaml
+}
+service_restart_all() {
+  echo -e "restarting all containers"
+  docker compose up -d --force-recreate
+  save_canonical_compose_config
+}
+service_restart() {
+  service_name=$1
+  rebuild_image=${2:-0}
 
-  if [ "$2" == "1" ]; then
-    echo 'also removing container and rebuilding image'
-    docker container rm "${SERVICE_PREFIX}_${1}" || true
-    docker compose build --no-cache --progress=plain $1
+  dk_up_flags='-d --force-recreate'
+
+  if [ "$rebuild_image" == "1" ]; then
+    echo 'also rebuilding container image'
+    dk_up_flags="$dk_up_flags --build"
   fi
-  docker compose up -d $1 --remove-orphans
-fi
 
-dk_ps
-
-echo -e "forcing .env.${ENV}.compose.[yaml, json] in current dir"
-docker compose convert | yq -r -o=json >.env.${ENV}.compose.json
-docker compose convert >.env.${ENV}.compose.yaml
-# docker compose config
+  docker compose up $dk_up_flags $service_name
+  save_canonical_compose_config
+}
+cmd=${1:-'all'}
+case $cmd in
+all) service_restart_all ;;
+*) service_restart "$@" ;;
+esac
