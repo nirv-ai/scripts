@@ -13,6 +13,7 @@ VAULT_INSTANCE_CONFIG_DIR="$VAULT_INSTANCE_SRC_DIR/config"
 UNSEAL_TOKENS="${ROOT_TOKEN:-$JAIL/tokens/root/unseal_tokens.json}"
 ROOT_PGP_KEY="${ROOT_PGP_KEY:-$JAIL/tokens/root/root.asc}"
 ADMIN_PGP_KEY_DIR="${ADMIN_PGP_KEY_DIR:-$JAIL/tokens/admin}"
+OTHER_TOKEN_DIR="${OTHER_TOKEN_DIR:-$JAIL/tokens/other}"
 
 # vars
 TOKEN_HEADER="X-Vault-Token: $TOKEN"
@@ -342,6 +343,8 @@ process_engine_configs() {
   throw_if_dir_doesnt_exist $VAULT_INSTANCE_CONFIG_DIR
 
   for engine_config in $VAULT_INSTANCE_CONFIG_DIR/*/secret-engine/secret_*.json; do
+    test -f $engine_config || break
+
     local engine_config_filename=$(get_file_name $engine_config)
 
     # configure shell to parse filename into expected components
@@ -397,6 +400,7 @@ process_token_role_in_dir() {
 
   for token_role in $VAULT_INSTANCE_CONFIG_DIR/*/token-role/token_role*.json; do
     test -f $token_role || break
+
     echo_debug "creating token_role: $token_role"
 
     local token_role_filename=$(get_file_name $token_role)
@@ -421,14 +425,13 @@ process_token_role_in_dir() {
   done
 }
 process_tokens_in_dir() {
-  local token_dir_full_path="$VAULT_INSTANCE_SRC_DIR/config"
-  throw_if_dir_doesnt_exist $token_dir_full_path
+  throw_if_dir_doesnt_exist $VAULT_INSTANCE_CONFIG_DIR
+  mkdir -p $OTHER_TOKEN_DIR
 
-  local token_dir_full_path="$token_dir_full_path/*"
-  echo_debug "\nchecking for token create files in: $token_dir_full_path"
+  for token_config in $VAULT_INSTANCE_CONFIG_DIR/*/token/token_create*; do
+    test -f $token_config || break
 
-  for file_starts_with_token_create_ in $token_dir_full_path; do
-    local token_create_filename=$(get_file_name $file_starts_with_token_create_)
+    local token_create_filename=$(get_file_name $token_config)
 
     # configure shell to parse filename into expected components
     PREV_IFS="$IFS"               # save prev boundary
@@ -443,8 +446,8 @@ process_tokens_in_dir() {
     auth_scheme=${1:-''}
     token_type=${2:-''}
     token_name=${3:-''}
-    ROLE_ID_FILE="${JAIL}/${token_type}.id.json"
-    CREDENTIAL_FILE="${JAIL}/${token_type}.${token_name}.json"
+    ROLE_ID_FILE="${OTHER_TOKEN_DIR}/${token_type}.id.json"
+    CREDENTIAL_FILE="${OTHER_TOKEN_DIR}/${token_type}.${token_name}.json"
 
     case $auth_scheme in
     token_create_approle)
@@ -462,7 +465,7 @@ process_tokens_in_dir() {
       # save new token for authenticating as token_role
       vault_post_no_data $ADDR/$TOKEN_CREATE_CHILD/$token_type >$CREDENTIAL_FILE
       ;;
-    *) echo_debug "ignoring file with unknown format: $engine_config_filename" ;;
+    *) echo_debug "ignoring file with unknown format: $token_config" ;;
     esac
   done
 }
@@ -471,6 +474,8 @@ process_auths_in_dir() {
 
   # keeping case syntax as we'll likely integrate with more auth schemes
   for auth_config in $VAULT_INSTANCE_CONFIG_DIR/*/auth/*.json; do
+    test -f $auth_config || break
+
     case $auth_config in
     *"/auth_approle_role_"*)
       echo_debug "\nprocessing approle auth config:\n$auth_config\n"
@@ -508,15 +513,12 @@ enable_something_in_dir() {
   done
 }
 process_secret_data_in_dir() {
-  local hydrate_dir_full_path="$VAULT_INSTANCE_SRC_DIR/config"
-  throw_if_dir_doesnt_exist $hydrate_dir_full_path
+  throw_if_dir_doesnt_exist $VAULT_INSTANCE_CONFIG_DIR
 
-  local hydrate_dir_full_path="$hydrate_dir_full_path/*"
+  for secret_data in $VAULT_INSTANCE_CONFIG_DIR/*/secret-data/hydrate_*.json; do
+    test -f $secret_data || break
 
-  echo_debug "\nchecking for hydration files in: $hydrate_dir_full_path"
-
-  for file_starts_with_hydrate_ in $hydrate_dir_full_path; do
-    local data_hydrate_filename=$(get_file_name $file_starts_with_hydrate_)
+    local data_hydrate_filename=$(get_file_name $secret_data)
 
     # configure shell to parse filename into expected components
     PREV_IFS="$IFS"               # save prev boundary
@@ -536,15 +538,15 @@ process_secret_data_in_dir() {
     'hydrate_kv1')
       echo_debug "\n$engine_type\n\n[ENGINE_PATH]: $engine_path\n[SECRET_PATH]: $secret_path\n"
 
-      vault_post_data "@${file_starts_with_hydrate_}" "$ADDR/$SECRET_KV1/$secret_path"
+      vault_post_data "@${secret_data}" "$ADDR/$SECRET_KV1/$secret_path"
 
       ;;
     'hydrate_kv2')
       echo_debug "\n$engine_type\n\n[ENGINE_PATH]: $engine_path\n[SECRET_PATH]: $secret_path\n"
-      payload_data=$(data_data_only $file_starts_with_hydrate_)
+      payload_data=$(data_data_only $secret_data)
       vault_post_data "${payload_data}" "$ADDR/$SECRET_KV2_DATA/$secret_path" >/dev/null
       ;;
-    *) echo_debug "ignoring file with unknown format: $engine_config_filename" ;;
+    *) echo_debug "ignoring file with unknown format: $secret_data" ;;
     esac
   done
 }
