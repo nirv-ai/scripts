@@ -7,15 +7,30 @@
 
 set -euo pipefail
 
-# @see bookOfNoah
+NAME_PREFIX=${CUNT_NAME_PREFIX:-'nirvai_'}
+POSTGRES_HOSTNAME=${POSTGRES_HOSTNAME:-'web_postgres'}
+POSTGRES_VOL_NAME="${NAME_PREFIX}${POSTGRES_HOSTNAME}"
+ENV=${ENV:-development}
+
 dk_ps() {
   docker ps --no-trunc -a --format 'table {{.Names}}\n\t{{.Image}}\n\t{{.Status}}\n\t{{.Command}}\n\n' | tac
 }
 
-SERVICE_PREFIX=${SERVICE_PREFIX:-'nirvai_'}
-POSTGRES_HOSTNAME=${POSTGRES_HOSTNAME:-'web_postgres'}
-POSTGRES_VOL_NAME="${SERVICE_PREFIX}${POSTGRES_HOSTNAME}"
-ENV=${ENV:-development}
+get_cunt_id() {
+  container_id=$(docker ps --no-trunc -aqf "name=^${1}$")
+
+  if test ${#container_id} -gt 6; then
+    echo $container_id
+  else
+    container_name_with_prefix="${NAME_PREFIX}${1}"
+    container_id=$(docker ps --no-trunc -aqf "name=^${container_name_with_prefix}$")
+    if test ${#container_id} -gt 6; then
+      echo $container_id
+    fi
+  fi
+
+  echo ""
+}
 
 create_volumes() {
   docker volume create $POSTGRES_VOL_NAME || true
@@ -34,33 +49,16 @@ echo -e "running reset"
 docker compose config
 
 case $1 in
-logs)
-  name=${2:-""}
-  if [[ -z $name ]]; then
-    echo -e "syntax: logs appname"
-    exit 1
-  fi
-  cname="${SERVICE_PREFIX}${name}"
-  ## docker inspect --format="{{.Id}}" some_container_name
-  id=$(docker inspect --format="{{.Id}}" $cname)
-  if [[ -z $id ]]; then
-    echo -e "id not found: did you pass in the correct name?"
-    exit 1
-  fi
-  echo -e "displaying log file for container $cname with id $id"
-  sudo cat /var/lib/docker/containers/$id/$id-json.log | jq
-  exit 0
-  ;;
 volumes)
   create_volumes
   docker volume ls
   ;;
 core*)
   echo "resetting infrastructore for $1"
-  if ! docker container kill ${SERVICE_PREFIX}${1}; then
+  if ! docker container kill ${NAME_PREFIX}${1}; then
     echo "container for service $1 already dead"
   else
-    docker container rm ${SERVICE_PREFIX}${1}
+    docker container rm ${NAME_PREFIX}${1}
   fi
   docker container prune -f
   docker volume prune

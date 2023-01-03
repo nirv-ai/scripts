@@ -17,14 +17,14 @@ get_cunt_name() {
     fi
   fi
 
-  echo
+  echo ""
 }
 
 exec_into_container() {
   cunt_name=$(get_cunt_name $1)
 
   if test -z "$cunt_name"; then
-    echo -e "couldnt find container with name $1 or ${NAME_PREFIX}${1}"
+    echo "\ncouldnt find container with name $1 or ${NAME_PREFIX}${1}"
     exit 1
   fi
 
