@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 
-set -eu
+set -euo pipefail
 
 SERVICE_PREFIX=${SERVICE_PREFIX:-'nirvai_'}
 

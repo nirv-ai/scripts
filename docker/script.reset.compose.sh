@@ -5,7 +5,7 @@
 # for something less destructive, use refresh script
 ###########################
 
-set -e
+set -euo pipefail
 
 # @see bookOfNoah
 dk_ps() {

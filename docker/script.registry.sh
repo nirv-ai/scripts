@@ -2,7 +2,7 @@
 
 # TODO: https://github.com/docker/docs/blob/main/registry/deploying.md#restricting-access
 
-set -eu
+set -euo pipefail
 
 # required
 REG_CERTS_PATH=${REG_CERTS_PATH:-'/etc/ssl/certs'}
