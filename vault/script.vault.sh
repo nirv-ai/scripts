@@ -9,6 +9,7 @@ ADDR="${VAULT_ADDR:?VAULT_ADDR not set: exiting}/v1"
 TOKEN="${VAULT_TOKEN:?VAULT_TOKEN not set: exiting}"
 DEBUG=${NIRV_SCRIPT_DEBUG:-''}
 VAULT_INSTANCE_SRC_DIR="${VAULT_INSTANCE_SRC_DIR:-''}"
+VAULT_INSTANCE_CONFIG_DIR="$VAULT_INSTANCE_SRC_DIR/config"
 UNSEAL_TOKENS="${ROOT_TOKEN:-$JAIL/tokens/root/unseal_tokens.json}"
 ROOT_PGP_KEY="${ROOT_PGP_KEY:-$JAIL/tokens/root/root.asc}"
 ADMIN_PGP_KEY_DIR="${ADMIN_PGP_KEY_DIR:-$JAIL/tokens/admin}"
@@ -83,13 +84,13 @@ invalid_request() {
 }
 throw_if_file_doesnt_exist() {
   if test ! -f "$1"; then
-    echo_debug "file doesnt exist: $1"
+    echo -e "file doesnt exist: $1"
     exit 1
   fi
 }
 throw_if_dir_doesnt_exist() {
   if test ! -d "$1"; then
-    echo_debug "directory doesnt exist: $1"
+    echo -e "directory doesnt exist: $1"
     exit 1
   fi
 }
@@ -212,36 +213,6 @@ data_policy_only() {
 
 #################### single use fns
 ## single executions
-## -n=key-shares
-## -t=key-threshold (# of key shares required to unseal)
-## TODO: we should NOT Be using the vault cli for anything in this file
-init_vault() {
-  local PGP_KEYS="$ROOT_PGP_KEY"
-
-  throw_if_file_doesnt_exist $PGP_KEYS
-  throw_if_dir_doesnt_exist $ADMIN_PGP_KEY_DIR
-
-  local KEY_SHARES=1
-  local THRESHOLD=${1:-2}
-
-  for pgpkey_ends_with_asc in $ADMIN_PGP_KEY_DIR/*.asc; do
-    PGP_KEYS="${PGP_KEYS},$pgpkey_ends_with_asc"
-    KEY_SHARES=$((KEY_SHARES + 1))
-  done
-
-  if test $KEY_SHARES -lt $THRESHOLD; then
-    echo "you need atleast $THRESHOLD tokens: $KEY_SHARES found"
-    exit 1
-  fi
-
-  echo_debug 'this may take some time...'
-  vault operator init \
-    -format="json" \
-    -n=$KEY_SHARES \
-    -t=$THRESHOLD \
-    -root-token-pgp-key="$ROOT_PGP_KEY" \
-    -pgp-keys="$PGP_KEYS" >$JAIL/tokens/root/unseal_tokens.json
-}
 get_single_unseal_token() {
   echo $(
     cat $UNSEAL_TOKENS |
@@ -309,6 +280,54 @@ enable_something() {
   vault_post_data $data "$ADDR/$URL"
 }
 ################################ workflows
+## TODO: we should NOT Be using the vault cli for anything in this file
+init_vault() {
+  local PGP_KEYS="$ROOT_PGP_KEY"
+
+  throw_if_file_doesnt_exist $PGP_KEYS
+  throw_if_dir_doesnt_exist $ADMIN_PGP_KEY_DIR
+
+  local KEY_SHARES=1
+  local THRESHOLD=${1:-2}
+
+  for pgpkey_ends_with_asc in $ADMIN_PGP_KEY_DIR/*.asc; do
+    PGP_KEYS="${PGP_KEYS},$pgpkey_ends_with_asc"
+    KEY_SHARES=$((KEY_SHARES + 1))
+  done
+
+  if test $KEY_SHARES -lt $THRESHOLD; then
+    echo "you need atleast $THRESHOLD tokens: $KEY_SHARES found"
+    exit 1
+  fi
+
+  echo_debug 'this may take some time...'
+  vault operator init \
+    -format="json" \
+    -n=$KEY_SHARES \
+    -t=$THRESHOLD \
+    -root-token-pgp-key="$ROOT_PGP_KEY" \
+    -pgp-keys="$PGP_KEYS" >$JAIL/tokens/root/unseal_tokens.json
+}
+
+process_vault_admins_in_dir() {
+  throw_if_dir_doesnt_exist $VAULT_INSTANCE_CONFIG_DIR
+
+  for policy in $VAULT_INSTANCE_CONFIG_DIR/*/vault-admin/policy_*.hcl; do
+    throw_if_file_doesnt_exist $policy
+
+    echo_debug "creating policy: $policy"
+    create_policy $policy
+  done
+
+  for token_config in $VAULT_INSTANCE_CONFIG_DIR/*/vault-admin/token_*.json; do
+    throw_if_file_doesnt_exist $token_config
+
+    local token_name=$(get_file_name $token_config)
+    echo_debug "creating admin token: $token_config"
+    vault_post_data "@${token_config}" $ADDR/$TOKEN_CREATE_CHILD >$ADMIN_PGP_KEY_DIR/$token_name
+  done
+}
+
 process_policies_in_dir() {
   local policy_dir_full_path="$VAULT_INSTANCE_SRC_DIR/config"
   throw_if_dir_doesnt_exist $policy_dir_full_path
