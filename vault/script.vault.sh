@@ -488,36 +488,31 @@ process_auths_in_dir() {
   done
 }
 enable_something_in_dir() {
-  local enable_something_full_dir="$(get_payload_path $1)"
-  throw_if_dir_doesnt_exist $enable_something_full_dir
+  throw_if_dir_doesnt_exist $VAULT_INSTANCE_CONFIG_DIR
 
-  local enable_something_full_dir="$enable_something_full_dir/*"
-  echo_debug "\nchecking for enable.thisthing.atthispath files in:\n$enable_something_full_dir\n"
+  for feature in $VAULT_INSTANCE_CONFIG_DIR/*/enable-feature/enable*; do
+    test -f $feature || break
 
-  for file_starts_with_enable_X in $enable_something_full_dir; do
-    case $file_starts_with_enable_X in
-    *"/enable"*)
-      local auth_filename=$(get_file_name $file_starts_with_enable_X)
+    echo_debug "enabling feature: $feature"
+    local feature_name=$(get_file_name $feature)
 
-      # configure shell to parse filename into expected components
-      PREV_IFS="$IFS"       # save prev boundary
-      IFS="."               # enable.thisThing.atThisPath
-      set -f                # stop wildcard * expansion
-      set -- $auth_filename # break filename @ '.' into positional args
+    # configure shell to parse filename into expected components
+    PREV_IFS="$IFS"      # save prev boundary
+    IFS="."              # enable.thisThing.atThisPath
+    set -f               # stop wildcard * expansion
+    set -- $feature_name # break filename @ '.' into positional args
 
-      # reset shell back to normal
-      set +f
-      IFS=$PREV_IFS
+    # reset shell back to normal
+    set +f
+    IFS=$PREV_IFS
 
-      # make request if 2 and 3 are set, but 4 isnt
-      if test -n ${2:-} && test -n ${3:-''} && test -z ${4:-''}; then
-        enable_something $2 $3
-      else
-        echo_debug "ignoring file\ndidnt match expectations: $auth_filename"
-        echo_debug 'filename syntax: ^enable.THING.AT_PATH$\n'
-      fi
-      ;;
-    esac
+    # make request if 2 and 3 are set, but 4 isnt
+    if test -n ${2:-} && test -n ${3:-''} && test -z ${4:-''}; then
+      enable_something $2 $3
+    else
+      echo_debug "ignoring file\ndidnt match expectations: $feature_name"
+      echo_debug 'filename syntax: ^enable.THING.AT_PATH$\n'
+    fi
   done
 }
 process_secret_data_in_dir() {
