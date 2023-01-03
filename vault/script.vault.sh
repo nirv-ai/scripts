@@ -472,17 +472,14 @@ process_tokens_in_dir() {
   done
 }
 process_auths_in_dir() {
-  local auth_dir_full_path="$VAULT_INSTANCE_SRC_DIR/config"
-  throw_if_dir_doesnt_exist $auth_dir_full_path
+  throw_if_dir_doesnt_exist $VAULT_INSTANCE_CONFIG_DIR
 
-  local auth_dir_full_path="$auth_dir_full_path/*"
-  echo_debug "\nchecking for auth configs in: $auth_dir_full_path"
-
-  for file_starts_with_auth_ in $auth_dir_full_path; do
-    case $file_starts_with_auth_ in
+  # keeping case syntax as we'll likely integrate with more auth schemes
+  for auth_config in $VAULT_INSTANCE_CONFIG_DIR/*/auth/*.json; do
+    case $auth_config in
     *"/auth_approle_role_"*)
-      echo_debug "\nprocessing approle auth config:\n$file_starts_with_auth_\n"
-      create_approle $file_starts_with_auth_
+      echo_debug "\nprocessing approle auth config:\n$auth_config\n"
+      create_approle $auth_config
       ;;
     esac
   done
@@ -510,7 +507,7 @@ enable_something_in_dir() {
     if test -n ${2:-} && test -n ${3:-''} && test -z ${4:-''}; then
       enable_something $2 $3
     else
-      echo_debug "ignoring file\ndidnt match expectations: $feature_name"
+      echo_debug "ignoring file\ndidnt match expectations: $feature"
       echo_debug 'filename syntax: ^enable.THING.AT_PATH$\n'
     fi
   done
