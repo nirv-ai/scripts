@@ -339,14 +339,10 @@ process_policies_in_dir() {
   done
 }
 process_engine_configs() {
-  local engine_config_dir_full_path="$VAULT_INSTANCE_SRC_DIR/config"
-  throw_if_dir_doesnt_exist $engine_config_dir_full_path
+  throw_if_dir_doesnt_exist $VAULT_INSTANCE_CONFIG_DIR
 
-  local engine_config_dir_full_path="$engine_config_dir_full_path/*"
-  echo_debug "\nchecking for engine configuration files in: $engine_config_dir_full_path"
-
-  for file_starts_with_secret_ in $engine_config_dir_full_path; do
-    local engine_config_filename=$(get_file_name $file_starts_with_secret_)
+  for engine_config in $VAULT_INSTANCE_CONFIG_DIR/*/secret-engine/secret_*.json; do
+    local engine_config_filename=$(get_file_name $engine_config)
 
     # configure shell to parse filename into expected components
     PREV_IFS="$IFS"                # save prev boundary
@@ -370,7 +366,7 @@ process_engine_configs() {
       case $3 in
       config)
         echo_debug "creating config for $engine_type enabled at path: $two"
-        vault_post_data "@${file_starts_with_secret_}" "$ADDR/$two/$three"
+        vault_post_data "@${engine_config}" "$ADDR/$two/$three"
         ;;
       *) echo_debug "ignoring unknown file format: $engine_config_filename" ;;
       esac
@@ -381,17 +377,16 @@ process_engine_configs() {
       case $three in
       config)
         echo_debug "creating config for db: $two\n"
-        vault_post_data "@${file_starts_with_secret_}" "$ADDR/$DB_CONFIG/$two"
+        vault_post_data "@${engine_config}" "$ADDR/$DB_CONFIG/$two"
         vault_post_no_data "$ADDR/$DB_ROTATE/$two"
         ;;
 
       role)
         echo_debug "creating role ${four} for db ${two}\n"
-        vault_post_data "@${file_starts_with_secret_}" "$ADDR/$DB_ROLES/$four"
+        vault_post_data "@${engine_config}" "$ADDR/$DB_ROLES/$four"
         ;;
       *) echo_debug "ignoring file with unknown format: $engine_config_filename" ;;
       esac
-      # echo_debug "\nTODO: not ready for database config: $file_starts_with_secret_\n"
       ;;
     *) echo_debug "ignoring file with unknown format: $engine_config_filename" ;;
     esac
