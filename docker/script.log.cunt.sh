@@ -1,10 +1,5 @@
 #!/usr/bin/env bash
 
-###########################
-# resets a container & image
-# for something less destructive, use refresh script
-###########################
-
 set -euo pipefail
 
 NAME_PREFIX=${CUNT_NAME_PREFIX:-'nirvai_'}

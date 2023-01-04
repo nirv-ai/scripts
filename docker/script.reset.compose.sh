@@ -1,10 +1,5 @@
 #!/usr/bin/env bash
 
-###########################
-# resets a container & image
-# for something less destructive, use refresh script
-###########################
-
 set -euo pipefail
 
 ENV=${ENV:-development}
@@ -22,7 +17,7 @@ down() {
   docker compose down $down_flags
 }
 up() {
-  up_flags='-d --build --force-recreate'
+  up_flags='-d --build --force-recreate --renew-anon-volumes'
   service_name=${1:-''}
   if test -n "$service_name"; then
     up_flags="$up_flags $service_name"

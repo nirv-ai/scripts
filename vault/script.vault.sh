@@ -8,6 +8,12 @@ set -euo pipefail
 ADDR="${VAULT_ADDR:?VAULT_ADDR not set: exiting}/v1"
 TOKEN="${VAULT_TOKEN:?VAULT_TOKEN not set: exiting}"
 DEBUG=${NIRV_SCRIPT_DEBUG:-''}
+VAULT_INSTANCE_SRC_DIR="${VAULT_INSTANCE_SRC_DIR:-''}"
+VAULT_INSTANCE_CONFIG_DIR="$VAULT_INSTANCE_SRC_DIR/config"
+UNSEAL_TOKENS="${ROOT_TOKEN:-$JAIL/tokens/root/unseal_tokens.json}"
+ROOT_PGP_KEY="${ROOT_PGP_KEY:-$JAIL/tokens/root/root.asc}"
+ADMIN_PGP_KEY_DIR="${ADMIN_PGP_KEY_DIR:-$JAIL/tokens/admin}"
+OTHER_TOKEN_DIR="${OTHER_TOKEN_DIR:-$JAIL/tokens/other}"
 
 # vars
 TOKEN_HEADER="X-Vault-Token: $TOKEN"
@@ -79,13 +85,13 @@ invalid_request() {
 }
 throw_if_file_doesnt_exist() {
   if test ! -f "$1"; then
-    echo_debug "file doesnt exist: $1"
+    echo -e "file doesnt exist: $1"
     exit 1
   fi
 }
 throw_if_dir_doesnt_exist() {
   if test ! -d "$1"; then
-    echo_debug "directory doesnt exist: $1"
+    echo -e "directory doesnt exist: $1"
     exit 1
   fi
 }
@@ -208,21 +214,9 @@ data_policy_only() {
 
 #################### single use fns
 ## single executions
-## -n=key-shares
-## -t=key-threshold (# of key shares required to unseal)
-init_vault() {
-  # TODO: we should NOT Be using the vault cli for anything in this file
-  echo_debug 'this may take some time...'
-  vault operator init \
-    -format="json" \
-    -n=2 \
-    -t=2 \
-    -root-token-pgp-key="$JAIL/root.asc" \
-    -pgp-keys="$JAIL/root.asc,$JAIL/admin_vault.asc" >$JAIL/root.unseal.json
-}
 get_single_unseal_token() {
   echo $(
-    cat $JAIL/root.unseal.json |
+    cat $UNSEAL_TOKENS |
       jq -r ".unseal_keys_b64[$1]" |
       base64 --decode |
       gpg -dq
@@ -231,7 +225,7 @@ get_single_unseal_token() {
 get_unseal_tokens() {
   echo -e "VAULT_TOKEN:\n\n$VAULT_TOKEN\n"
   echo -e "UNSEAL_TOKEN(s):\n"
-  unseal_threshold=$(cat $JAIL/root.unseal.json | jq '.unseal_threshold')
+  unseal_threshold=$(cat $UNSEAL_TOKENS | jq '.unseal_threshold')
   i=0
   while [ $i -lt $unseal_threshold ]; do
     echo -e "\n$(get_single_unseal_token $i)"
@@ -239,7 +233,7 @@ get_unseal_tokens() {
   done
 }
 unseal_vault() {
-  unseal_threshold=$(cat $JAIL/root.unseal.json | jq '.unseal_threshold')
+  unseal_threshold=$(cat $UNSEAL_TOKENS | jq '.unseal_threshold')
   i=0
   while [ $i -lt $unseal_threshold ]; do
     vault operator unseal $(get_single_unseal_token $i)
@@ -287,31 +281,71 @@ enable_something() {
   vault_post_data $data "$ADDR/$URL"
 }
 ################################ workflows
+## TODO: we should NOT Be using the vault cli for anything in this file
+init_vault() {
+  local PGP_KEYS="$ROOT_PGP_KEY"
+
+  throw_if_file_doesnt_exist $PGP_KEYS
+  throw_if_dir_doesnt_exist $ADMIN_PGP_KEY_DIR
+
+  local KEY_SHARES=1
+  local THRESHOLD=${1:-2}
+
+  for pgpkey_ends_with_asc in $ADMIN_PGP_KEY_DIR/*.asc; do
+    PGP_KEYS="${PGP_KEYS},$pgpkey_ends_with_asc"
+    KEY_SHARES=$((KEY_SHARES + 1))
+  done
+
+  if test $KEY_SHARES -lt $THRESHOLD; then
+    echo "you need atleast $THRESHOLD tokens: $KEY_SHARES found"
+    exit 1
+  fi
+
+  echo_debug 'this may take some time...'
+  vault operator init \
+    -format="json" \
+    -n=$KEY_SHARES \
+    -t=$THRESHOLD \
+    -root-token-pgp-key="$ROOT_PGP_KEY" \
+    -pgp-keys="$PGP_KEYS" >$JAIL/tokens/root/unseal_tokens.json
+}
+
+process_vault_admins_in_dir() {
+  throw_if_dir_doesnt_exist $VAULT_INSTANCE_CONFIG_DIR
+
+  for policy in $VAULT_INSTANCE_CONFIG_DIR/*/vault-admin/policy_*.hcl; do
+    throw_if_file_doesnt_exist $policy
+
+    echo_debug "creating policy: $policy"
+    create_policy $policy
+  done
+
+  for token_config in $VAULT_INSTANCE_CONFIG_DIR/*/vault-admin/token_*.json; do
+    throw_if_file_doesnt_exist $token_config
+
+    local token_name=$(get_file_name $token_config)
+    echo_debug "creating admin token: $token_config"
+    vault_post_data "@${token_config}" $ADDR/$TOKEN_CREATE_CHILD >$ADMIN_PGP_KEY_DIR/$token_name
+  done
+}
+
 process_policies_in_dir() {
-  local policy_dir_full_path="$(get_payload_path $1)"
-  throw_if_dir_doesnt_exist $policy_dir_full_path
+  throw_if_dir_doesnt_exist $VAULT_INSTANCE_CONFIG_DIR
 
-  local policy_dir_full_path="$policy_dir_full_path/*"
-  echo_debug "\nchecking for policies in: $policy_dir_full_path"
+  for policy in $VAULT_INSTANCE_CONFIG_DIR/*/policy/policy_*.hcl; do
+    test -f $policy || break
 
-  for file_starts_with_policy_ in $policy_dir_full_path; do
-    case $file_starts_with_policy_ in
-    *"/policy_"*)
-      echo_debug "\nprocessing policy: $file_starts_with_policy_\n"
-      create_policy $file_starts_with_policy_
-      ;;
-    esac
+    echo_debug "creating policy: $policy"
+    create_policy $policy
   done
 }
 process_engine_configs() {
-  local engine_config_dir_full_path="$(get_payload_path $1)"
-  throw_if_dir_doesnt_exist $engine_config_dir_full_path
+  throw_if_dir_doesnt_exist $VAULT_INSTANCE_CONFIG_DIR
 
-  local engine_config_dir_full_path="$engine_config_dir_full_path/*"
-  echo_debug "\nchecking for engine configuration files in: $engine_config_dir_full_path"
+  for engine_config in $VAULT_INSTANCE_CONFIG_DIR/*/secret-engine/secret_*.json; do
+    test -f $engine_config || break
 
-  for file_starts_with_secret_ in $engine_config_dir_full_path; do
-    local engine_config_filename=$(get_file_name $file_starts_with_secret_)
+    local engine_config_filename=$(get_file_name $engine_config)
 
     # configure shell to parse filename into expected components
     PREV_IFS="$IFS"                # save prev boundary
@@ -335,7 +369,7 @@ process_engine_configs() {
       case $3 in
       config)
         echo_debug "creating config for $engine_type enabled at path: $two"
-        vault_post_data "@${file_starts_with_secret_}" "$ADDR/$two/$three"
+        vault_post_data "@${engine_config}" "$ADDR/$two/$three"
         ;;
       *) echo_debug "ignoring unknown file format: $engine_config_filename" ;;
       esac
@@ -346,64 +380,58 @@ process_engine_configs() {
       case $three in
       config)
         echo_debug "creating config for db: $two\n"
-        vault_post_data "@${file_starts_with_secret_}" "$ADDR/$DB_CONFIG/$two"
+        vault_post_data "@${engine_config}" "$ADDR/$DB_CONFIG/$two"
         vault_post_no_data "$ADDR/$DB_ROTATE/$two"
         ;;
 
       role)
         echo_debug "creating role ${four} for db ${two}\n"
-        vault_post_data "@${file_starts_with_secret_}" "$ADDR/$DB_ROLES/$four"
+        vault_post_data "@${engine_config}" "$ADDR/$DB_ROLES/$four"
         ;;
       *) echo_debug "ignoring file with unknown format: $engine_config_filename" ;;
       esac
-      # echo_debug "\nTODO: not ready for database config: $file_starts_with_secret_\n"
       ;;
     *) echo_debug "ignoring file with unknown format: $engine_config_filename" ;;
     esac
   done
 }
 process_token_role_in_dir() {
-  local token_role_dir_full_path="$(get_payload_path $1)"
-  throw_if_dir_doesnt_exist $token_role_dir_full_path
+  throw_if_dir_doesnt_exist $VAULT_INSTANCE_CONFIG_DIR
 
-  local token_role_dir_full_path="$token_role_dir_full_path/*"
-  echo_debug "\nchecking for token roles in: $token_role_dir_full_path"
+  for token_role in $VAULT_INSTANCE_CONFIG_DIR/*/token-role/token_role*.json; do
+    test -f $token_role || break
 
-  for file_starts_with_token_role in $token_role_dir_full_path; do
-    case $file_starts_with_token_role in
-    *"/token_role"*)
-      local token_role_filename=$(get_file_name $file_starts_with_token_role)
+    echo_debug "creating token_role: $token_role"
 
-      # configure shell to parse filename into expected components
-      PREV_IFS="$IFS"             # save prev boundary
-      IFS="."                     # enable.thisThing.atThisPath
-      set -f                      # stop wildcard * expansion
-      set -- $token_role_filename # break filename @ '.' into positional args
+    local token_role_filename=$(get_file_name $token_role)
 
-      # reset shell back to normal
-      set +f
-      IFS=$PREV_IFS
+    # configure shell to parse filename into expected components
+    PREV_IFS="$IFS"             # save prev boundary
+    IFS="."                     # enable.thisThing.atThisPath
+    set -f                      # stop wildcard * expansion
+    set -- $token_role_filename # break filename @ '.' into positional args
 
-      # make request if 2 is set, but 3 isnt
-      if test -n ${2:-''} && test -n ${3:-''} && test -z ${4:-''}; then
-        vault_post_data "@${file_starts_with_token_role}" "$ADDR/$TOKEN_CREATE_ROLE/${2}"
-      else
-        echo_debug "ignoring file\ndidnt match expectations: $token_role_filename"
-        echo_debug 'filename syntax: ^token_role.ROLE_NAME$\n'
-      fi
-      ;;
-    esac
+    # reset shell back to normal
+    set +f
+    IFS=$PREV_IFS
+
+    # make request if 2 is set, but 3 isnt
+    if test -n ${2:-''} && test -n ${3:-''} && test -z ${4:-''}; then
+      vault_post_data "@${token_role}" "$ADDR/$TOKEN_CREATE_ROLE/${2}"
+    else
+      echo_debug "ignoring file\ndidnt match expectations: $token_role_filename"
+      echo_debug 'filename syntax: ^token_role.ROLE_NAME$\n'
+    fi
   done
 }
 process_tokens_in_dir() {
-  local token_dir_full_path="$(get_payload_path $1)"
-  throw_if_dir_doesnt_exist $token_dir_full_path
+  throw_if_dir_doesnt_exist $VAULT_INSTANCE_CONFIG_DIR
+  mkdir -p $OTHER_TOKEN_DIR
 
-  local token_dir_full_path="$token_dir_full_path/*"
-  echo_debug "\nchecking for token create files in: $token_dir_full_path"
+  for token_config in $VAULT_INSTANCE_CONFIG_DIR/*/token/token_create*; do
+    test -f $token_config || break
 
-  for file_starts_with_token_create_ in $token_dir_full_path; do
-    local token_create_filename=$(get_file_name $file_starts_with_token_create_)
+    local token_create_filename=$(get_file_name $token_config)
 
     # configure shell to parse filename into expected components
     PREV_IFS="$IFS"               # save prev boundary
@@ -418,8 +446,8 @@ process_tokens_in_dir() {
     auth_scheme=${1:-''}
     token_type=${2:-''}
     token_name=${3:-''}
-    ROLE_ID_FILE="${JAIL}/${token_type}.id.json"
-    CREDENTIAL_FILE="${JAIL}/${token_type}.${token_name}.json"
+    ROLE_ID_FILE="${OTHER_TOKEN_DIR}/${token_type}.id.json"
+    CREDENTIAL_FILE="${OTHER_TOKEN_DIR}/${token_type}.${token_name}.json"
 
     case $auth_scheme in
     token_create_approle)
@@ -437,69 +465,60 @@ process_tokens_in_dir() {
       # save new token for authenticating as token_role
       vault_post_no_data $ADDR/$TOKEN_CREATE_CHILD/$token_type >$CREDENTIAL_FILE
       ;;
-    *) echo_debug "ignoring file with unknown format: $engine_config_filename" ;;
+    *) echo_debug "ignoring file with unknown format: $token_config" ;;
     esac
   done
 }
 process_auths_in_dir() {
-  local auth_dir_full_path="$(get_payload_path $1)"
-  throw_if_dir_doesnt_exist $auth_dir_full_path
+  throw_if_dir_doesnt_exist $VAULT_INSTANCE_CONFIG_DIR
 
-  local auth_dir_full_path="$auth_dir_full_path/*"
-  echo_debug "\nchecking for auth configs in: $auth_dir_full_path"
+  # keeping case syntax as we'll likely integrate with more auth schemes
+  for auth_config in $VAULT_INSTANCE_CONFIG_DIR/*/auth/*.json; do
+    test -f $auth_config || break
 
-  for file_starts_with_auth_ in $auth_dir_full_path; do
-    case $file_starts_with_auth_ in
+    case $auth_config in
     *"/auth_approle_role_"*)
-      echo_debug "\nprocessing approle auth config:\n$file_starts_with_auth_\n"
-      create_approle $file_starts_with_auth_
+      echo_debug "\nprocessing approle auth config:\n$auth_config\n"
+      create_approle $auth_config
       ;;
     esac
   done
 }
 enable_something_in_dir() {
-  local enable_something_full_dir="$(get_payload_path $1)"
-  throw_if_dir_doesnt_exist $enable_something_full_dir
+  throw_if_dir_doesnt_exist $VAULT_INSTANCE_CONFIG_DIR
 
-  local enable_something_full_dir="$enable_something_full_dir/*"
-  echo_debug "\nchecking for enable.thisthing.atthispath files in:\n$enable_something_full_dir\n"
+  for feature in $VAULT_INSTANCE_CONFIG_DIR/*/enable-feature/enable*; do
+    test -f $feature || break
 
-  for file_starts_with_enable_X in $enable_something_full_dir; do
-    case $file_starts_with_enable_X in
-    *"/enable"*)
-      local auth_filename=$(get_file_name $file_starts_with_enable_X)
+    echo_debug "enabling feature: $feature"
+    local feature_name=$(get_file_name $feature)
 
-      # configure shell to parse filename into expected components
-      PREV_IFS="$IFS"       # save prev boundary
-      IFS="."               # enable.thisThing.atThisPath
-      set -f                # stop wildcard * expansion
-      set -- $auth_filename # break filename @ '.' into positional args
+    # configure shell to parse filename into expected components
+    PREV_IFS="$IFS"      # save prev boundary
+    IFS="."              # enable.thisThing.atThisPath
+    set -f               # stop wildcard * expansion
+    set -- $feature_name # break filename @ '.' into positional args
 
-      # reset shell back to normal
-      set +f
-      IFS=$PREV_IFS
+    # reset shell back to normal
+    set +f
+    IFS=$PREV_IFS
 
-      # make request if 2 and 3 are set, but 4 isnt
-      if test -n ${2:-} && test -n ${3:-''} && test -z ${4:-''}; then
-        enable_something $2 $3
-      else
-        echo_debug "ignoring file\ndidnt match expectations: $auth_filename"
-        echo_debug 'filename syntax: ^enable.THING.AT_PATH$\n'
-      fi
-      ;;
-    esac
+    # make request if 2 and 3 are set, but 4 isnt
+    if test -n ${2:-} && test -n ${3:-''} && test -z ${4:-''}; then
+      enable_something $2 $3
+    else
+      echo_debug "ignoring file\ndidnt match expectations: $feature"
+      echo_debug 'filename syntax: ^enable.THING.AT_PATH$\n'
+    fi
   done
 }
-hydrate_data_in_dir() {
-  local hydrate_dir_full_path="$(get_payload_path $1)"
-  throw_if_dir_doesnt_exist $hydrate_dir_full_path
+process_secret_data_in_dir() {
+  throw_if_dir_doesnt_exist $VAULT_INSTANCE_CONFIG_DIR
 
-  local hydrate_dir_full_path="$hydrate_dir_full_path/*"
+  for secret_data in $VAULT_INSTANCE_CONFIG_DIR/*/secret-data/hydrate_*.json; do
+    test -f $secret_data || break
 
-  echo_debug "\nchecking for hydration files in: $hydrate_dir_full_path"
-
-  for file_starts_with_hydrate_ in $hydrate_dir_full_path; do
-    local data_hydrate_filename=$(get_file_name $file_starts_with_hydrate_)
+    local data_hydrate_filename=$(get_file_name $secret_data)
 
     # configure shell to parse filename into expected components
     PREV_IFS="$IFS"               # save prev boundary
@@ -519,22 +538,22 @@ hydrate_data_in_dir() {
     'hydrate_kv1')
       echo_debug "\n$engine_type\n\n[ENGINE_PATH]: $engine_path\n[SECRET_PATH]: $secret_path\n"
 
-      vault_post_data "@${file_starts_with_hydrate_}" "$ADDR/$SECRET_KV1/$secret_path"
+      vault_post_data "@${secret_data}" "$ADDR/$SECRET_KV1/$secret_path"
 
       ;;
     'hydrate_kv2')
       echo_debug "\n$engine_type\n\n[ENGINE_PATH]: $engine_path\n[SECRET_PATH]: $secret_path\n"
-      payload_data=$(data_data_only $file_starts_with_hydrate_)
+      payload_data=$(data_data_only $secret_data)
       vault_post_data "${payload_data}" "$ADDR/$SECRET_KV2_DATA/$secret_path" >/dev/null
       ;;
-    *) echo_debug "ignoring file with unknown format: $engine_config_filename" ;;
+    *) echo_debug "ignoring file with unknown format: $secret_data" ;;
     esac
   done
 }
 
 ###################### CMDS
 case $1 in
-init) init_vault ;;
+init) init_vault ${2:-2} ;;
 get_unseal_tokens) get_unseal_tokens ;;
 get_single_unseal_token)
   token_index=${2-0}
@@ -564,7 +583,7 @@ list)
     secret_path=${4:-''}
     case $3 in
     kv1) vault_list "$ADDR/$SECRET_KV1/$secret_path" ;;
-    kv2) vault_list "$ADDR/$SECRET_KV2/$secret_path" ;;
+    kv2) vault_list "$ADDR/$SECRET_KV2_KEYS/$secret_path" ;;
     esac
     ;;
   secret-engines)
@@ -889,34 +908,15 @@ process)
   processwhat=${2:-''}
 
   case $processwhat in
-  policy_in_dir)
-    dir=${3:?'syntax: process policy_in_dir [/]path/to/dir'}
-    process_policies_in_dir $dir
-    ;;
-  token_role_in_dir)
-    dir=${3:?'syntax: process token_role_in_dir [/]path/to/dir'}
-    process_token_role_in_dir $dir
-    ;;
-  auth_in_dir)
-    dir=${3:?'syntax: process auth_in_dir [/]path/to/dir'}
-    process_auths_in_dir $dir
-    ;;
-  enable_feature)
-    dir=${3:?'syntax: process enable_feature [/]path/to/dir'}
-    enable_something_in_dir $dir
-    ;;
-  engine_config)
-    dir=${3:?'syntax: process engine_config [/]path/to/dir'}
-    process_engine_configs $dir
-    ;;
-  token_in_dir)
-    dir=${3:?'syntax: process token_in_dir [/]path/to/dir'}
-    process_tokens_in_dir $dir
-    ;;
-  secret_data_in_dir)
-    dir=${3:?'syntax: process hydrate_secret_data [/]path/to/dir'}
-    hydrate_data_in_dir $dir
-    ;;
+  # this is the init order
+  vault_admin) process_vault_admins_in_dir ;;
+  policy) process_policies_in_dir ;;
+  token_role) process_token_role_in_dir ;;
+  enable_feature) enable_something_in_dir ;;
+  auth) process_auths_in_dir ;;
+  secret_engine) process_engine_configs ;;
+  token) process_tokens_in_dir ;;
+  secret_data) process_secret_data_in_dir ;;
   *) invalid_request ;;
   esac
   ;;
