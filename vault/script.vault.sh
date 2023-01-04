@@ -583,7 +583,7 @@ list)
     secret_path=${4:-''}
     case $3 in
     kv1) vault_list "$ADDR/$SECRET_KV1/$secret_path" ;;
-    kv2) vault_list "$ADDR/$SECRET_KV2/$secret_path" ;;
+    kv2) vault_list "$ADDR/$SECRET_KV2_KEYS/$secret_path" ;;
     esac
     ;;
   secret-engines)
