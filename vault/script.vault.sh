@@ -119,7 +119,7 @@ get_filename_without_extension() {
 vault_curl() {
   echo_debug "[url]: $1\n[args]: ${@:2}\n------------\n\n"
 
-  curlargs = '-H "Connection: close"'
+  curlargs='-H "Connection: close"'
   if [ "$DEBUG" = 1 ]; then
     curlargs="$curlargs -v"
   else
