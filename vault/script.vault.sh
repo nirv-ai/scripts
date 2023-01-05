@@ -6,12 +6,12 @@ set -euo pipefail
 
 # interface
 ADDR="${VAULT_ADDR:?VAULT_ADDR not set: exiting}/v1"
-ADMIN_PGP_KEY_DIR="${ADMIN_PGP_KEY_DIR:-$JAIL/tokens/admin}"
+ADMIN_PGP_KEY_DIR="${ADMIN_PGP_KEY_DIR:-${JAIL}/tokens/admin}"
 DEBUG="${NIRV_SCRIPT_DEBUG:-''}"
-OTHER_TOKEN_DIR="${OTHER_TOKEN_DIR:-$JAIL/tokens/other}"
-ROOT_PGP_KEY="${ROOT_PGP_KEY:-$JAIL/tokens/root/root.asc}"
+OTHER_TOKEN_DIR="${OTHER_TOKEN_DIR:-${JAIL}/tokens/other}"
+ROOT_PGP_KEY="${ROOT_PGP_KEY:-${JAIL}/tokens/root/root.asc}"
 TOKEN="${VAULT_TOKEN:?VAULT_TOKEN not set: exiting}"
-UNSEAL_TOKENS="${ROOT_TOKEN:-$JAIL/tokens/root/unseal_tokens.json}"
+UNSEAL_TOKENS="${ROOT_TOKEN:-${JAIL}/tokens/root/unseal_tokens.json}"
 VAULT_INSTANCE_SRC_DIR="${VAULT_INSTANCE_SRC_DIR:-''}"
 
 VAULT_INSTANCE_CONFIG_DIR="${VAULT_INSTANCE_SRC_DIR}/config"
