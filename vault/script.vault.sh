@@ -319,29 +319,34 @@ init_vault() {
     -pgp-keys="$PGP_KEYS" >$JAIL/tokens/root/unseal_tokens.json
 }
 
+should_process() {
+  local file_path=${1:-''}
+
+  case $(test -n $VAULT_CONFIG_TARGET && echo $?) in
+  0)
+    case $file_path in
+    $VAULT_CONFIG_TARGET*) return 0 ;;
+    *) return 1 ;;
+    esac
+    ;;
+  esac
+
+  return 0
+}
 process_vault_admins_in_dir() {
   throw_if_dir_doesnt_exist $VAULT_INSTANCE_CONFIG_DIR
 
   for policy in $VAULT_INSTANCE_CONFIG_DIR/*/vault-admin/policy_*.hcl; do
-    throw_if_file_doesnt_exist $policy
-
-    case $(test -n $VAULT_CONFIG_TARGET && echo $?) in
-    0)
-      case $policy in
-      $VAULT_CONFIG_TARGET*)
-        echo_debug "processing target: $VAULT_CONFIG_TARGET"
-        ;;
-      *) continue ;;
-      esac
-      ;;
-    esac
+    test -f $policy || break
+    if ! should_process $policy; then continue; fi
 
     echo_debug "creating policy: $policy"
     create_policy $policy
   done
 
   for token_config in $VAULT_INSTANCE_CONFIG_DIR/*/vault-admin/token_*.json; do
-    throw_if_file_doesnt_exist $token_config
+    test -f $token_config || break
+    if ! should_process $token_config; then continue; fi
 
     local token_name=$(get_file_name $token_config)
     echo_debug "creating admin token: $token_config"
@@ -354,17 +359,7 @@ process_policies_in_dir() {
 
   for policy in $VAULT_INSTANCE_CONFIG_DIR/*/policy/policy_*.hcl; do
     test -f $policy || break
-
-    case $(test -n $VAULT_CONFIG_TARGET && echo $?) in
-    0)
-      case $policy in
-      $VAULT_CONFIG_TARGET*)
-        echo_debug "processing target: $VAULT_CONFIG_TARGET"
-        ;;
-      *) continue ;;
-      esac
-      ;;
-    esac
+    if ! should_process $policy; then continue; fi
 
     echo_debug "creating policy: $policy"
     create_policy $policy
@@ -375,17 +370,7 @@ process_engine_configs() {
 
   for engine_config in $VAULT_INSTANCE_CONFIG_DIR/*/secret-engine/secret_*.json; do
     test -f $engine_config || break
-
-    case $(test -n $VAULT_CONFIG_TARGET && echo $?) in
-    0)
-      case $engine_config in
-      $VAULT_CONFIG_TARGET*)
-        echo_debug "processing target: $VAULT_CONFIG_TARGET"
-        ;;
-      *) continue ;;
-      esac
-      ;;
-    esac
+    if ! should_process $engine_config; then continue; fi
 
     local engine_config_filename=$(get_file_name $engine_config)
 
@@ -442,17 +427,7 @@ process_token_role_in_dir() {
 
   for token_role in $VAULT_INSTANCE_CONFIG_DIR/*/token-role/token_role*.json; do
     test -f $token_role || break
-
-    case $(test -n $VAULT_CONFIG_TARGET && echo $?) in
-    0)
-      case $token_role in
-      $VAULT_CONFIG_TARGET*)
-        echo_debug "processing target: $VAULT_CONFIG_TARGET"
-        ;;
-      *) continue ;;
-      esac
-      ;;
-    esac
+    if ! should_process $token_role; then continue; fi
 
     echo_debug "creating token_role: $token_role"
 
@@ -483,17 +458,7 @@ process_tokens_in_dir() {
 
   for token_config in $VAULT_INSTANCE_CONFIG_DIR/*/token/token_create*; do
     test -f $token_config || break
-
-    case $(test -n $VAULT_CONFIG_TARGET && echo $?) in
-    0)
-      case $token_config in
-      $VAULT_CONFIG_TARGET*)
-        echo_debug "processing target: $VAULT_CONFIG_TARGET"
-        ;;
-      *) continue ;;
-      esac
-      ;;
-    esac
+    if ! should_process $token_config; then continue; fi
 
     local token_create_filename=$(get_file_name $token_config)
 
@@ -539,17 +504,7 @@ process_auths_in_dir() {
   # keeping case syntax as we'll likely integrate with more auth schemes
   for auth_config in $VAULT_INSTANCE_CONFIG_DIR/*/auth/*.json; do
     test -f $auth_config || break
-
-    case $(test -n $VAULT_CONFIG_TARGET && echo $?) in
-    0)
-      case $auth_config in
-      $VAULT_CONFIG_TARGET*)
-        echo_debug "processing target: $VAULT_CONFIG_TARGET"
-        ;;
-      *) continue ;;
-      esac
-      ;;
-    esac
+    if ! should_process $auth_config; then continue; fi
 
     case $auth_config in
     *"/auth_approle_role_"*)
@@ -564,17 +519,7 @@ enable_something_in_dir() {
 
   for feature in $VAULT_INSTANCE_CONFIG_DIR/*/enable-feature/enable*; do
     test -f $feature || break
-
-    case $(test -n $VAULT_CONFIG_TARGET && echo $?) in
-    0)
-      case $feature in
-      $VAULT_CONFIG_TARGET*)
-        echo_debug "processing target: $VAULT_CONFIG_TARGET"
-        ;;
-      *) continue ;;
-      esac
-      ;;
-    esac
+    if ! should_process $feature; then continue; fi
 
     echo_debug "enabling feature: $feature"
     local feature_name=$(get_file_name $feature)
@@ -603,17 +548,7 @@ process_secret_data_in_dir() {
 
   for secret_data in $VAULT_INSTANCE_CONFIG_DIR/*/secret-data/hydrate_*.json; do
     test -f $secret_data || break
-
-    case $(test -n $VAULT_CONFIG_TARGET && echo $?) in
-    0)
-      case $secret_data in
-      $VAULT_CONFIG_TARGET*)
-        echo_debug "processing target: $VAULT_CONFIG_TARGET"
-        ;;
-      *) continue ;;
-      esac
-      ;;
-    esac
+    if ! should_process $secret_data; then continue; fi
 
     local data_hydrate_filename=$(get_file_name $secret_data)
 
