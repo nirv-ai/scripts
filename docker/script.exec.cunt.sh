@@ -2,18 +2,21 @@
 
 set -eu
 
-NAME_PREFIX=${CUNT_NAME_PREFIX:-'nirvai_'}
+# TODO: update docs about using the project + service name instead of hardcoding a container name
+NAME_PREFIX=${CUNT_NAME_PREFIX:-'nirvai_core-'}
 
+# gets the first container with the matching name
 get_cunt_name() {
-  container_id=$(docker ps -aqf "name=^${1}$")
+  # perhaps they passed the containers full name
+  local container_id=$(docker ps -aqf "name=^${1}$")
 
   if test ${#container_id} -gt 6; then
-    echo $1
-  else
+    echo $container_id
+  else # try with the prefix
     container_name_with_prefix="${NAME_PREFIX}${1}"
-    container_id=$(docker ps -aqf "name=^${container_name_with_prefix}$")
+    container_id=$(docker ps -aqf "name=^${container_name_with_prefix}" | head -n 1)
     if test ${#container_id} -gt 6; then
-      echo $container_name_with_prefix
+      echo $container_id
     fi
   fi
 
@@ -21,18 +24,18 @@ get_cunt_name() {
 }
 
 exec_into_container() {
-  cunt_name=$(get_cunt_name $1)
+  cunt_id=$(get_cunt_name $1)
 
-  if test -z "$cunt_name"; then
+  if test -z "$cunt_id"; then
     echo "\ncouldnt find container with name $1 or ${NAME_PREFIX}${1}"
     exit 1
   fi
 
-  echo "trying to exec with bash: $cunt_name\n"
-  if ! docker exec -it "$cunt_name" bash; then
+  echo "trying to exec with bash: $1: $cunt_id\n"
+  if ! docker exec -it "$cunt_id" bash; then
     echo
-    echo "trying to exec with sh: $cunt_name\n"
-    docker exec -it "$cunt_name" sh
+    echo "trying to exec with sh: $1: $cunt_id\n"
+    docker exec -it "$cunt_id" sh
   fi
 }
 
