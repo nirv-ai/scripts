@@ -79,6 +79,10 @@ create)
     cd $JAIL/consul/tls
     consul tls ca create -domain ${DOMAIN}
     consul tls cert create -server -domain ${DOMAIN} -dc=${DATACENTER}
+    # should work for everything except letsencrypt
+    # ^ which throws too many redirects when trying to use in docker
+    # ^ however should try again with docker secrets for letsencrypt
+    # ln -s `pwd`/development /etc/ssl/certs/development
     ;;
   *) invalid_request ;;
   esac
