@@ -11,11 +11,14 @@ set -euo pipefail
 BASE_DIR=$(pwd)
 REPO_DIR=$BASE_DIR/core
 APPS_DIR=$REPO_DIR/apps
+
 APP_PREFIX=nirvai
+ENV=development
 CONSUL_INSTANCE_DIR_NAME=core-consul
 CONSUL_INSTANCE_SRC_DIR=$APPS_DIR/$APP_PREFIX-$CONSUL_INSTANCE_DIR_NAME/src
 CONSUL_DATA_DIR="${CONSUL_INSTANCE_SRC_DIR}/data"
 CONSUL_INSTANCE_CONFIG_DIR="${CONSUL_INSTANCE_SRC_DIR}/config"
+CONSUL_IAC_DIR="${APPS_DIR}/${APP_PREFIX}-core-iac/${ENV}/consul"
 
 ## vars
 CONSUL_SERVICE_NAME=core_consul
@@ -66,7 +69,12 @@ create)
 
   case $what in
   gossipkey) echo $(consul keygen) ;;
-  tls) echo 'creating ca and server cert files' ;;
+  tls)
+    throw_if_dir_doesnt_exist $CONSUL_IAC_DIR
+    cd $CONSUL_IAC_DIR
+    consul tls ca create -domain ${DOMAIN}
+    consul tls cert create -server -domain ${DOMAIN} -dc=${DATACENTER}
+    ;;
   *) invalid_request ;;
   esac
   ;;
