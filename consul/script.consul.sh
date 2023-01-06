@@ -2,6 +2,7 @@
 
 # inspired by https://github.com/hashicorp-education/learn-consul-get-started-vms/tree/main/scripts
 ## TODO: must match the interface set by the other scripts
+## TODO: this file should *only* use the http api
 
 set -euo pipefail
 
@@ -24,7 +25,7 @@ DOMAIN="mesh.nirv.ai"
 
 # CONSUL_CONFIG_TARGET="${CONSUL_INSTANCE_CONFIG_DIR}/${CONSUL_CONFIG_TARGET:-''}"
 
-######################## DEBUG ECHO
+######################## ERROR HANDLING
 echo_debug() {
   if [ "$DEBUG" = 1 ]; then
     echo -e '\n\n[DEBUG] SCRIPT.CONSUL.SH\n------------'
@@ -32,19 +33,42 @@ echo_debug() {
     echo -e "------------\n\n"
   fi
 }
+invalid_request() {
+  local INVALID_REQUEST_MSG="invalid request: @see https://github.com/nirv-ai/docs/blob/main/consul/README.md"
 
-cmd=${1:?'available cmds: create'}
-cmdhelp='@see https://github.com/nirv-ai/docs/tree/main/consul'
+  echo_debug $INVALID_REQUEST_MSG
+}
+throw_if_file_doesnt_exist() {
+  if test ! -f "$1"; then
+    echo -e "file doesnt exist: $1"
+    exit 1
+  fi
+}
+throw_if_dir_doesnt_exist() {
+  if test ! -d "$1"; then
+    echo -e "directory doesnt exist: $1"
+    exit 1
+  fi
+}
+
+######################## utils
+validate() {
+  file_or_dir=${1:-'file or directory required for validation'}
+
+  consule validate $1
+}
+
+cmd=${1:-''}
 
 case $cmd in
 create)
   what=${2:?'syntax: create gossipkey|tls'}
 
   case $what in
-  gossipkey) echo 'creating gossip key' ;;
+  gossipkey) echo $(consul keygen) ;;
   tls) echo 'creating ca and server cert files' ;;
-  *) echo $cmdhelp ;;
+  *) invalid_request ;;
   esac
   ;;
-*) echo $cmdhelp ;;
+*) $invalid_request ;;
 esac
