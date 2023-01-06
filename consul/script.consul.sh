@@ -18,7 +18,7 @@ CONSUL_INSTANCE_DIR_NAME=core-consul
 CONSUL_INSTANCE_SRC_DIR=$APPS_DIR/$APP_PREFIX-$CONSUL_INSTANCE_DIR_NAME/src
 CONSUL_DATA_DIR="${CONSUL_INSTANCE_SRC_DIR}/data"
 CONSUL_INSTANCE_CONFIG_DIR="${CONSUL_INSTANCE_SRC_DIR}/config"
-CONSUL_IAC_DIR="${APPS_DIR}/${APP_PREFIX}-core-iac/${ENV}/consul"
+JAIL="${BASE_DIR}/secrets/${ENV}"
 
 ## vars
 CONSUL_SERVICE_NAME=core_consul
@@ -65,13 +65,18 @@ cmd=${1:-''}
 
 case $cmd in
 create)
-  what=${2:?'syntax: create gossipkey|tls'}
+  what=${2:?''}
 
   case $what in
-  gossipkey) echo $(consul keygen) ;;
+  gossipkey)
+    throw_if_dir_doesnt_exist $JAIL
+    mkdir -p $JAIL/consul/tls
+    consul keygen >$JAIL/consul/tls/gossipkey
+    ;;
   tls)
-    throw_if_dir_doesnt_exist $CONSUL_IAC_DIR
-    cd $CONSUL_IAC_DIR
+    throw_if_dir_doesnt_exist $JAIL
+    mkdir -p $JAIL/consul/tls
+    cd $JAIL/consul/tls
     consul tls ca create -domain ${DOMAIN}
     consul tls cert create -server -domain ${DOMAIN} -dc=${DATACENTER}
     ;;
