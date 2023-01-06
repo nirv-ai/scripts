@@ -41,7 +41,7 @@ create)
   what=${2:?'syntax: create config'}
 
   case $what in
-  config)
+  config) # these are creating static files, likely not appropriate for a script
     type=${3:?'syntax: create config server|client|mesh'}
     case $type in
     server) echo_debug 'creating server config' ;;
