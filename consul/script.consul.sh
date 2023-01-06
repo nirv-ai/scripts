@@ -38,17 +38,11 @@ cmdhelp='@see https://github.com/nirv-ai/docs/tree/main/consul'
 
 case $cmd in
 create)
-  what=${2:?'syntax: create config'}
+  what=${2:?'syntax: create gossipkey|tls'}
 
   case $what in
-  config) # these are creating static files, likely not appropriate for a script
-    type=${3:?'syntax: create config server|client|mesh'}
-    case $type in
-    server) echo_debug 'creating server config' ;;
-    client) echo_debug 'creating client config' ;;
-    mesh) echo_debug 'creating client mesh config' ;;
-    esac
-    ;;
+  gossipkey) echo 'creating gossip key' ;;
+  tls) echo 'creating ca and server cert files' ;;
   *) echo $cmdhelp ;;
   esac
   ;;
