@@ -80,6 +80,10 @@ create)
     mkdir -p $JAIL/consul/tls
     consul keygen >$JAIL/consul/tls/gossipkey
     ;;
+  consul-admin-token)
+    mkdir -p $JAIL/consul/tokens
+    consul acl bootstrap --format json >$JAIL/consul/tokens/admin-consul.token.json
+    ;;
   tls)
     throw_if_dir_doesnt_exist $JAIL
 
