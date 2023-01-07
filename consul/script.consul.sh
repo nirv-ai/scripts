@@ -22,9 +22,9 @@ JAIL="${BASE_DIR}/secrets/${ENV}"
 
 ## vars
 CONSUL_SERVICE_NAME=core_consul
-DATACENTER="us-east"
+DATACENTER=us-east
 DEBUG="${NIRV_SCRIPT_DEBUG:-1}"
-DOMAIN="mesh.nirv.ai"
+MESH_HOSTNAME=mesh.nirv.ai
 
 # CONSUL_CONFIG_TARGET="${CONSUL_INSTANCE_CONFIG_DIR}/${CONSUL_CONFIG_TARGET:-''}"
 
@@ -68,6 +68,13 @@ create)
   what=${2:?''}
 
   case $what in
+  consul_group)
+    echo_debug "sudo required: adding $USER to group consul"
+
+    sudo groupadd consul 2>/dev/null
+    sudo usermod -aG consul $USER
+    # sudo chown -R $USER:consul /etc/ssl/certs/development/consul
+    ;;
   gossipkey)
     throw_if_dir_doesnt_exist $JAIL
     mkdir -p $JAIL/consul/tls
@@ -75,17 +82,45 @@ create)
     ;;
   tls)
     throw_if_dir_doesnt_exist $JAIL
+
     mkdir -p $JAIL/consul/tls
+    rm -rf $JAIL/consul/tls/*.pem
+    sudo rm -rf $CONSUL_DATA_DIR/*
     cd $JAIL/consul/tls
-    consul tls ca create -domain ${DOMAIN}
-    consul tls cert create -server -domain ${DOMAIN} -dc=${DATACENTER}
-    # should work for everything except letsencrypt
-    # ^ which throws too many redirects when trying to use in docker
-    # ^ however should try again with docker secrets for letsencrypt
+    name=consul-ca
+
+    # generate priv key and cert for consul ca
+    cfssl print-defaults csr |
+      cfssl gencert -initca - |
+      cfssljson -bare $name
+
+    # generate privkey and cert for consul server
+    echo '{}' |
+      cfssl gencert -ca=$name.pem -ca-key=$name-key.pem -config=cfssl.json \
+        -hostname="localhost,127.0.0.1,server.${DATACENTER}.${MESH_HOSTNAME},${MESH_HOSTNAME}" - |
+      cfssljson -bare server
+
+    # generate certs for the client server
+    echo '{}' |
+      cfssl gencert -ca=$name.pem -ca-key=$name-key.pem -config=cfssl.json \
+        -hostname="localhost,127.0.0.1,${MESH_HOSTNAME}" - |
+      cfssljson -bare client
+
+    # generate certs for cli communication
+    echo '{}' |
+      cfssl gencert -ca=$name.pem -ca-key=$name-key.pem -profile=client - |
+      cfssljson -bare cli
+
+    for file in $JAIL/consul/tls/*.pem; do
+      echo -e "\n\nvalidating file: $file\n\n"
+      openssl x509 -in $file -text -alias 2>/dev/null || true
+    done
+    chmod 0644 $JAIL/consul/tls/*.pem
+    chmod 0640 $JAIL/consul/tls/*key.pem
     # ln -s `pwd`/development /etc/ssl/certs/development
     ;;
   *) invalid_request ;;
   esac
   ;;
-*) $invalid_request ;;
+*) invalid_request ;;
 esac
