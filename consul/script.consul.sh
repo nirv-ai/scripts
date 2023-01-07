@@ -2,7 +2,8 @@
 
 # inspired by https://github.com/hashicorp-education/learn-consul-get-started-vms/tree/main/scripts
 ## TODO: must match the interface set by the other scripts
-## TODO: this file should *only* use the http api
+## TODO: this file can use either the cli/http api
+### ^ every node requires the consul binary anyway, unlike vault
 
 set -euo pipefail
 
