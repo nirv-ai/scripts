@@ -64,6 +64,17 @@ validate() {
 cmd=${1:-''}
 
 case $cmd in
+get)
+  what=${2:?''}
+  case $what in
+  admin-token)
+    consul_admin_token="${JAIL}/consul/tokens/admin-consul.token.json"
+    throw_if_file_doesnt_exist $consul_admin_token
+    echo $(cat $consul_admin_token | jq -r ".SecretID")
+    ;;
+  *) invalid_request ;;
+  esac
+  ;;
 create)
   what=${2:?''}
 
