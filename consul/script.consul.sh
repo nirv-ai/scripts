@@ -5,19 +5,27 @@
 ## TODO: must match the interface set by the other scripts
 ## TODO: this file can use either the cli/http api
 ### ^ every node requires the consul binary anyway, unlike vault
-################
-# general flow
-## create tokens rootca, server client & cli certs using script.ssl.sh
-## create gossipkey using this script
-## start core_consul
-## validate cli not allowed: consul info
-### should receive error: Error querying agent: Unexpected response code: 403 (Permission denied: token with AccessorID '00000000-0000-0000-0000-000000000002' lacks permission 'agent:read' on "consul")
-## create admin token using this script
-## source .env (see configs)
-## valid cli can talk to consul: consul info
-### should not receive any errors
-### log in through the UI using the admin token: script.consul.sh get admin-token
-### should have access to everything
+################ general flow
+### create rootca & server certs
+# create tokens rootca, server client & cli certs using script.ssl.sh
+# create gossipkey using this script
+# start core_consul
+# validate cli not allowed: consul info
+# should receive error: Error querying agent: Unexpected response code: 403 (Permission denied: token with AccessorID '00000000-0000-0000-0000-000000000002' lacks permission 'agent:read' on "consul")
+# create admin token using this script
+# source .env (see configs)
+# valid cli can talk to consul: consul info
+# should not receive any errors
+# log in through the UI using the admin token: script.consul.sh get admin-token
+# should have access to almost everything
+### create policy files and push to consul server
+# see policy dir
+# dns policy: consul acl policy create -name 'acl-policy-dns' -description 'Policy for DNS endpoints' -rules @./acl-policy-dns.hcl
+# server policy: consul acl policy create -name 'acl-policy-server-node' -description 'Policy for Server nodes' -rules @./acl-policy-server-node.hcl
+# dns token: consul acl token create -description 'DNS - Default token' -policy-name acl-policy-dns --format json > ./acl-token-dns.json
+# server token: consul acl token create -description "server agent token" -policy-name acl-policy-server-node  --format json > ./server-acl-token.json
+# assign dns token to server: consul acl set-agent-token default ${DNS_TOKEN}
+# assign server token to server: consul acl set-agent-token agent ${SERVER_TOKEN}
 
 set -euo pipefail
 
@@ -76,12 +84,19 @@ validate() {
   consule validate $1
 }
 
+# consul kv put consul/configuration/db_port 5432
+# consul kv get consul/configuration/db_port
+# dig @127.0.0.1 -p 8600 consul.service.consul
+
 cmd=${1:-''}
 
 case $cmd in
 get)
   what=${2:?''}
   case $what in
+  server-members)
+    consul members
+    ;;
   admin-token)
     consul_admin_token="${JAIL}/tokens/admin-consul.token.json"
     throw_if_file_doesnt_exist $consul_admin_token
