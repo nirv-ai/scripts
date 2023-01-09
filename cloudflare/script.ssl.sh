@@ -76,24 +76,53 @@ create)
   rootca)
     echo 'creating rootca keys'
     mkdir -p $JAIL
-    cfssl genkey -initca ./mesh.dev.rootca.csr.json | cfssljson -bare $JAIL/ca
+    cfssl genkey -initca ./mesh.rootca.csr.json | cfssljson -bare $JAIL/ca
     ;;
   server)
     total=${3:-1}
-    echo "creating server certs $total server certs"
+    echo "creating $total server certificates"
     CA_CERT="${JAIL}/ca.pem"
     CA_PRIVKEY="${JAIL}/ca-key.pem"
     SERVER_CONFIG="${JAIL}/cfssl.json"
+
     i=0
     while [ $i -lt $total ]; do
       cfssl gencert \
         -ca=$CA_CERT \
         -ca-key=$CA_PRIVKEY \
         -config=$SERVER_CONFIG \
-        ./mesh.dev.server.csr.json |
+        ./mesh.server.csr.json |
         cfssljson -bare "${JAIL}/server-${i}"
       i=$((i + 1))
     done
+
+    ;;
+  client)
+    echo "creating client certificate"
+    CA_CERT="${JAIL}/ca.pem"
+    CA_PRIVKEY="${JAIL}/ca-key.pem"
+    CLIENT_CONFIG="${JAIL}/cfssl.json"
+
+    cfssl gencert \
+      -ca=$CA_CERT \
+      -ca-key=$CA_PRIVKEY \
+      -config=$CLIENT_CONFIG \
+      ./mesh.client.csr.json |
+      cfssljson -bare "${JAIL}/client"
+
+    ;;
+  cli)
+    echo "creating command line certificate"
+    CA_CERT="${JAIL}/ca.pem"
+    CA_PRIVKEY="${JAIL}/ca-key.pem"
+    CLI_CONFIG="${JAIL}/cfssl.json"
+
+    cfssl gencert \
+      -ca=$CA_CERT \
+      -ca-key=$CA_PRIVKEY \
+      -config=$CLI_CONFIG \
+      ./mesh.cli.csr.json |
+      cfssljson -bare "${JAIL}/cli"
 
     ;;
   *) invalid_request ;;
