@@ -43,6 +43,20 @@ throw_if_dir_doesnt_exist() {
 cmd=${1:-''}
 
 case $cmd in
+info)
+  what=${2:-''}
+  case $what in
+  cert)
+    echo -e "\ninfo about cert & pubkey\n\n"
+    cfssl certinfo -cert $JAIL/ca.pem
+    ;;
+  csr)
+    echo "info about csr"
+    cfssl certinfo -csr $JAIL/ca.csr
+    ;;
+  *) invalid_request ;;
+  esac
+  ;;
 create)
   what=${2:-''}
 
