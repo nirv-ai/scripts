@@ -18,7 +18,7 @@ fi
 SSL_CN=${SSL_CN:-"mesh.nirv.ai"}
 ENV=${ENV:-'development'}
 BASE_DIR=$(pwd)
-JAIL="${BASE_DIR}/secrets/${SSL_CN}/${ENV}"
+JAIL="${BASE_DIR}/secrets/${SSL_CN}/${ENV}/tls"
 
 ######################## ERROR HANDLING
 DEBUG="${NIRV_SCRIPT_DEBUG:-1}"
@@ -75,11 +75,27 @@ create)
   case $what in
   rootca)
     echo 'creating rootca keys'
-    ENV=development
     mkdir -p $JAIL
     cfssl genkey -initca ./mesh.dev.rootca.csr.json | cfssljson -bare $JAIL/ca
     ;;
+  server)
+    total=${3:-1}
+    echo "creating server certs $total server certs"
+    CA_CERT="${JAIL}/ca.pem"
+    CA_PRIVKEY="${JAIL}/ca-key.pem"
+    SERVER_CONFIG="${JAIL}/cfssl.json"
+    i=0
+    while [ $i -lt $total ]; do
+      cfssl gencert \
+        -ca=$CA_CERT \
+        -ca-key=$CA_PRIVKEY \
+        -config=$SERVER_CONFIG \
+        ./mesh.dev.server.csr.json |
+        cfssljson -bare "${JAIL}/server-${i}"
+      i=$((i + 1))
+    done
 
+    ;;
   *) invalid_request ;;
   esac
   ;;
