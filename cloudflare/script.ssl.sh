@@ -80,6 +80,8 @@ create)
     echo 'creating rootca keys'
     mkdir -p $JAIL
     cfssl genkey -initca ./mesh.rootca.csr.json | cfssljson -bare $JAIL/ca
+    chmod 0644 $JAIL/*.pem
+    chmod 0640 $JAIL/*key.pem
     ;;
   server)
     total=${3:-1}
@@ -99,6 +101,8 @@ create)
       i=$((i + 1))
     done
 
+    chmod 0644 $JAIL/*.pem
+    chmod 0640 $JAIL/*key.pem
     ;;
   client)
     echo "creating client certificate"
@@ -113,6 +117,8 @@ create)
       ./mesh.client.csr.json |
       cfssljson -bare "${JAIL}/client"
 
+    chmod 0644 $JAIL/*.pem
+    chmod 0640 $JAIL/*key.pem
     ;;
   cli)
     echo "creating command line certificate"
@@ -128,6 +134,8 @@ create)
       ./mesh.cli.csr.json |
       cfssljson -bare "${JAIL}/cli"
 
+    chmod 0644 $JAIL/*.pem
+    chmod 0640 $JAIL/*key.pem
     ;;
   *) invalid_request ;;
   esac

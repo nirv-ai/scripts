@@ -1,9 +1,23 @@
 #!/usr/bin/env bash
 
-# inspired by https://github.com/hashicorp-education/learn-consul-get-started-vms/tree/main/scripts
+################
+## inspired by https://github.com/hashicorp-education/learn-consul-get-started-vms/tree/main/scripts
 ## TODO: must match the interface set by the other scripts
 ## TODO: this file can use either the cli/http api
 ### ^ every node requires the consul binary anyway, unlike vault
+################
+# general flow
+## create tokens rootca, server client & cli certs using script.ssl.sh
+## create gossipkey using this script
+## start core_consul
+## validate cli not allowed: consul info
+### should receive error: Error querying agent: Unexpected response code: 403 (Permission denied: token with AccessorID '00000000-0000-0000-0000-000000000002' lacks permission 'agent:read' on "consul")
+## create admin token using this script
+## source .env (see configs)
+## valid cli can talk to consul: consul info
+### should not receive any errors
+### log in through the UI using the admin token: script.consul.sh get admin-token
+### should have access to everything
 
 set -euo pipefail
 
@@ -19,7 +33,7 @@ CONSUL_INSTANCE_DIR_NAME=core-consul
 CONSUL_INSTANCE_SRC_DIR=$APPS_DIR/$APP_PREFIX-$CONSUL_INSTANCE_DIR_NAME/src
 CONSUL_DATA_DIR="${CONSUL_INSTANCE_SRC_DIR}/data"
 CONSUL_INSTANCE_CONFIG_DIR="${CONSUL_INSTANCE_SRC_DIR}/config"
-JAIL="${BASE_DIR}/secrets/${ENV}"
+JAIL="${BASE_DIR}/secrets/mesh.nirv.ai/${ENV}"
 
 ## vars
 CONSUL_SERVICE_NAME=core_consul
@@ -38,7 +52,7 @@ echo_debug() {
   fi
 }
 invalid_request() {
-  local INVALID_REQUEST_MSG="invalid request: @see https://github.com/nirv-ai/docs/blob/main/consul/README.md"
+  local INVALID_REQUEST_MSG="invalid request: @see https://github.com/nirv-ai/docs/blob/main/README.md"
 
   echo_debug $INVALID_REQUEST_MSG
 }
@@ -69,7 +83,7 @@ get)
   what=${2:?''}
   case $what in
   admin-token)
-    consul_admin_token="${JAIL}/consul/tokens/admin-consul.token.json"
+    consul_admin_token="${JAIL}/tokens/admin-consul.token.json"
     throw_if_file_doesnt_exist $consul_admin_token
     echo $(cat $consul_admin_token | jq -r ".SecretID")
     ;;
@@ -89,52 +103,52 @@ create)
     ;;
   gossipkey)
     throw_if_dir_doesnt_exist $JAIL
-    mkdir -p $JAIL/consul/tls
-    consul keygen >$JAIL/consul/tls/gossipkey
+    mkdir -p $JAIL/tls
+    consul keygen >$JAIL/tls/gossipkey
     ;;
   consul-admin-token)
-    mkdir -p $JAIL/consul/tokens
-    consul acl bootstrap --format json >$JAIL/consul/tokens/admin-consul.token.json
+    mkdir -p $JAIL/tokens
+    consul acl bootstrap --format json >$JAIL/tokens/admin-consul.token.json
     ;;
-  tls)
-    throw_if_dir_doesnt_exist $JAIL
+  # tls)
+  #   throw_if_dir_doesnt_exist $JAIL
 
-    mkdir -p $JAIL/consul/tls
-    rm -rf $JAIL/consul/tls/*.pem
-    sudo rm -rf $CONSUL_DATA_DIR/*
-    cd $JAIL/consul/tls
-    name=consul-ca
+  #   mkdir -p $JAIL/tls
+  #   # rm -rf $JAIL/tls/*.pem
+  #   sudo rm -rf $CONSUL_DATA_DIR/*
+  #   cd $JAIL/tls
+  #   name=consul-ca
 
-    # generate priv key and cert for consul ca
-    cfssl print-defaults csr |
-      cfssl gencert -initca - |
-      cfssljson -bare $name
+  #   # generate priv key and cert for consul ca
+  #   cfssl print-defaults csr |
+  #     cfssl gencert -initca - |
+  #     cfssljson -bare $name
 
-    # generate privkey and cert for consul server
-    echo '{}' |
-      cfssl gencert -ca=$name.pem -ca-key=$name-key.pem -config=cfssl.json \
-        -hostname="localhost,127.0.0.1,server.${DATACENTER}.${MESH_HOSTNAME},${MESH_HOSTNAME}" - |
-      cfssljson -bare server
+  #   # generate privkey and cert for consul server
+  #   echo '{}' |
+  #     cfssl gencert -ca=$name.pem -ca-key=$name-key.pem -config=cfssl.json \
+  #       -hostname="localhost,127.0.0.1,server.${DATACENTER}.${MESH_HOSTNAME},${MESH_HOSTNAME}" - |
+  #     cfssljson -bare server
 
-    # generate certs for the client server
-    echo '{}' |
-      cfssl gencert -ca=$name.pem -ca-key=$name-key.pem -config=cfssl.json \
-        -hostname="localhost,127.0.0.1,${MESH_HOSTNAME}" - |
-      cfssljson -bare client
+  #   # generate certs for the client server
+  #   echo '{}' |
+  #     cfssl gencert -ca=$name.pem -ca-key=$name-key.pem -config=cfssl.json \
+  #       -hostname="localhost,127.0.0.1,${MESH_HOSTNAME}" - |
+  #     cfssljson -bare client
 
-    # generate certs for cli communication
-    echo '{}' |
-      cfssl gencert -ca=$name.pem -ca-key=$name-key.pem -profile=client - |
-      cfssljson -bare cli
+  #   # generate certs for cli communication
+  #   echo '{}' |
+  #     cfssl gencert -ca=$name.pem -ca-key=$name-key.pem -profile=client - |
+  #     cfssljson -bare cli
 
-    for file in $JAIL/consul/tls/*.pem; do
-      echo -e "\n\nvalidating file: $file\n\n"
-      openssl x509 -in $file -text -alias 2>/dev/null || true
-    done
-    chmod 0644 $JAIL/consul/tls/*.pem
-    chmod 0640 $JAIL/consul/tls/*key.pem
-    # ln -s `pwd`/development /etc/ssl/certs/development
-    ;;
+  #   for file in $JAIL/tls/*.pem; do
+  #     echo -e "\n\nvalidating file: $file\n\n"
+  #     openssl x509 -in $file -text -alias 2>/dev/null || true
+  #   done
+  #   chmod 0644 $JAIL/tls/*.pem
+  #   chmod 0640 $JAIL/tls/*key.pem
+  #   # ln -s `pwd`/development /etc/ssl/certs/development
+  #   ;;
   *) invalid_request ;;
   esac
   ;;
