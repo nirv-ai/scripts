@@ -41,6 +41,7 @@ CONSUL_INSTANCE_DIR_NAME=core-consul
 CONSUL_INSTANCE_SRC_DIR=$APPS_DIR/$APP_PREFIX-$CONSUL_INSTANCE_DIR_NAME/src
 CONSUL_DATA_DIR="${CONSUL_INSTANCE_SRC_DIR}/data"
 CONSUL_INSTANCE_CONFIG_DIR="${CONSUL_INSTANCE_SRC_DIR}/config"
+CONSUL_POLICY_DIR="${CONSUL_INSTANCE_SRC_DIR}/policy"
 JAIL="${BASE_DIR}/secrets/mesh.nirv.ai/${ENV}"
 
 ## vars
@@ -124,6 +125,17 @@ create)
   consul-admin-token)
     mkdir -p $JAIL/tokens
     consul acl bootstrap --format json >$JAIL/tokens/admin-consul.token.json
+    ;;
+  policy)
+    echo -e 'TODO: creating static policies\n\n'
+
+    consul acl policy create \
+      -name 'acl-policy-dns' \
+      -rules @$CONSUL_POLICY_DIR/acl-policy-dns.hcl 2>/dev/null
+
+    consul acl policy create \
+      -name 'acl-policy-server-node' \
+      -rules @$CONSUL_POLICY_DIR/acl-policy-server-node.hcl 2>/dev/null
     ;;
   *) invalid_request ;;
   esac
