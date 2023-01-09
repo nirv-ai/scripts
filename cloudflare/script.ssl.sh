@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
 
+###### @see https://developer.hashicorp.com/nomad/tutorials/transport-security/security-enable-tls#node-certificates
+## nomad & consul use the same certificate pattern
+## server.DATACENTER.DOMAIN for server certs
+## client.DATACENTER.DOMAIN for client serts
+## CLI certs use client certs
+######
+
 set -euo pipefail
 
 if ! type cfssl 2>&1 >/dev/null; then
@@ -44,22 +51,27 @@ cmd=${1:-''}
 
 case $cmd in
 info)
-  what=${2:-''}
-  case $what in
-  cert)
-    echo -e "\ninfo about cert & pubkey\n\n"
-    cfssl certinfo -cert $JAIL/ca.pem
-    ;;
-  csr)
-    echo "info about csr"
-    cfssl certinfo -csr $JAIL/ca.csr
+  who=${2:-''}
+  case $who in
+  rootca)
+    what=${3:-''}
+    case $what in
+    cert)
+      echo -e "\ninfo about cert & pubkey\n\n"
+      cfssl certinfo -cert $JAIL/ca.pem
+      ;;
+    csr)
+      echo "info about csr"
+      cfssl certinfo -csr $JAIL/ca.csr
+      ;;
+    *) invalid_request ;;
+    esac
     ;;
   *) invalid_request ;;
   esac
   ;;
 create)
   what=${2:-''}
-
   case $what in
   rootca)
     echo 'creating rootca keys'
