@@ -103,6 +103,16 @@ get)
     throw_if_file_doesnt_exist $consul_admin_token
     echo $(cat $consul_admin_token | jq -r ".SecretID")
     ;;
+  dns-token)
+    server_dns_Token="${JAIL}/tokens/acl-token-dns.json"
+    throw_if_file_doesnt_exist $server_dns_Token
+    echo $(cat $server_dns_Token | jq -r ".SecretID")
+    ;;
+  server-node-token)
+    server_node_token="${JAIL}/tokens/server-acl-token.json"
+    throw_if_file_doesnt_exist $server_node_token
+    echo $(cat $server_node_token | jq -r ".SecretID")
+    ;;
   *) invalid_request ;;
   esac
   ;;
