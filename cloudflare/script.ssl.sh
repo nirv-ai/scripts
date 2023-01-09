@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
-###### @see https://developer.hashicorp.com/nomad/tutorials/transport-security/security-enable-tls#node-certificates
+######
+## @see https://developer.hashicorp.com/nomad/tutorials/transport-security/security-enable-tls#node-certificates
+## @see https://github.com/cloudflare/cfssl/wiki/Creating-a-new-CSR
 ## nomad & consul use the same certificate pattern
 ## server.DATACENTER.DOMAIN for server certs
 ## client.DATACENTER.DOMAIN for client serts
@@ -11,6 +13,7 @@ set -euo pipefail
 
 if ! type cfssl 2>&1 >/dev/null; then
   echo -e "install cfssl before continuing: \nhttps://github.com/cloudflare/cfssl#installation"
+  echo -e "\nsudo apt install golang-cfssl"
 fi
 
 # INTERFACE
@@ -121,6 +124,7 @@ create)
       -ca=$CA_CERT \
       -ca-key=$CA_PRIVKEY \
       -config=$CLI_CONFIG \
+      -profile=client \
       ./mesh.cli.csr.json |
       cfssljson -bare "${JAIL}/cli"
 
