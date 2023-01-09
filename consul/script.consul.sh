@@ -110,45 +110,6 @@ create)
     mkdir -p $JAIL/tokens
     consul acl bootstrap --format json >$JAIL/tokens/admin-consul.token.json
     ;;
-  # tls)
-  #   throw_if_dir_doesnt_exist $JAIL
-
-  #   mkdir -p $JAIL/tls
-  #   # rm -rf $JAIL/tls/*.pem
-  #   sudo rm -rf $CONSUL_DATA_DIR/*
-  #   cd $JAIL/tls
-  #   name=consul-ca
-
-  #   # generate priv key and cert for consul ca
-  #   cfssl print-defaults csr |
-  #     cfssl gencert -initca - |
-  #     cfssljson -bare $name
-
-  #   # generate privkey and cert for consul server
-  #   echo '{}' |
-  #     cfssl gencert -ca=$name.pem -ca-key=$name-key.pem -config=cfssl.json \
-  #       -hostname="localhost,127.0.0.1,server.${DATACENTER}.${MESH_HOSTNAME},${MESH_HOSTNAME}" - |
-  #     cfssljson -bare server
-
-  #   # generate certs for the client server
-  #   echo '{}' |
-  #     cfssl gencert -ca=$name.pem -ca-key=$name-key.pem -config=cfssl.json \
-  #       -hostname="localhost,127.0.0.1,${MESH_HOSTNAME}" - |
-  #     cfssljson -bare client
-
-  #   # generate certs for cli communication
-  #   echo '{}' |
-  #     cfssl gencert -ca=$name.pem -ca-key=$name-key.pem -profile=client - |
-  #     cfssljson -bare cli
-
-  #   for file in $JAIL/tls/*.pem; do
-  #     echo -e "\n\nvalidating file: $file\n\n"
-  #     openssl x509 -in $file -text -alias 2>/dev/null || true
-  #   done
-  #   chmod 0644 $JAIL/tls/*.pem
-  #   chmod 0640 $JAIL/tls/*key.pem
-  #   # ln -s `pwd`/development /etc/ssl/certs/development
-  #   ;;
   *) invalid_request ;;
   esac
   ;;
