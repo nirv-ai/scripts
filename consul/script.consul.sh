@@ -126,6 +126,17 @@ create)
     mkdir -p $JAIL/tokens
     consul acl bootstrap --format json >$JAIL/tokens/admin-consul.token.json
     ;;
+  acl-token)
+    echo 'TODO: creating static acl tokens'
+
+    consul acl token create \
+      -policy-name acl-policy-dns \
+      --format json >$JAIL/tokens/acl-token-dns.json
+
+    consul acl token create \
+      -policy-name acl-policy-server-node \
+      --format json >$JAIL/tokens/server-acl-token.json
+    ;;
   policy)
     echo -e 'TODO: creating static policies\n\n'
 
