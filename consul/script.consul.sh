@@ -4,27 +4,27 @@
 ## inspired by https://github.com/hashicorp-education/learn-consul-get-started-vms/tree/main/scripts
 ## TODO: must match the interface set by the other scripts
 ## TODO: this file can use either the cli/http api
-## default files are owned by: systemd-network
 ### ^ every node requires the consul binary anyway, unlike vault
-################ general flow
+## default files are owned by: systemd-network
+################ general flow: TODO move this into docs and automate like script.vault.sh
 ### create rootca & server certs
 # create tokens rootca, server client & cli certs using script.ssl.sh
-# create gossipkey using this script
-# start core_consul
-# validate cli not allowed: consul info
-# should receive error: Error querying agent: Unexpected response code: 403 (Permission denied: token with AccessorID '00000000-0000-0000-0000-000000000002' lacks permission 'agent:read' on "consul")
-# create admin token using this script
-# source .env (see configs)
-# valid cli can talk to consul: consul info
-# should not receive any errors
-# log in through the UI using the admin token: script.consul.sh get admin-token
+# `create gossipkey`
+# script.reset core_consul
+# `get info` >>> Error querying agent: Unexpected response code: 403 (Permission denied: token with AccessorID '00000000-0000-0000-0000-000000000002' lacks permission 'agent:read' on "consul")
+# `create consul-admin-token`
+# `. .env.cli`
+# `get info` >>> should not receive any errors
+# `get consul-admin-token` >>> validate UI login
 # should have access to almost everything
 ### create policy files and tokens and push to consul server
 # see policy dir
-# see cmd: create policy
-# see cmd: create *token(s)
-# assign dns token to server: consul acl set-agent-token default ${DNS_TOKEN}
-# assign server token to server: consul acl set-agent-token agent ${SERVER_TOKEN}
+# `create policy`
+# `list policies`
+# `create acl-token`
+# `create server-token svc-name` # never use _ in service names, must match svc configs
+# `. .env.consul.server`
+# `list tokens`
 ### update docker images to include binary (see proxy for ubuntu, vault for alpine)
 ### discovery: add configs for to each client machine
 # @see https://developer.hashicorp.com/consul/tutorials/get-started-vms/virtual-machine-gs-service-discovery
@@ -102,6 +102,7 @@ cmd=${1:-''}
 case $cmd in
 set)
   what=${2:?''}
+
   case $what in
   agent-tokens)
     if test -z ${CONSUL_DNS_TOKEN:-''}; then
@@ -119,15 +120,29 @@ set)
     consul acl set-agent-token default ${CONSUL_DNS_TOKEN}
     consul acl set-agent-token agent ${CONSUL_SERVER_NODE_TOKEN}
     ;;
+  *) invalid_request ;;
+  esac
+  ;;
+list)
+  what=${2:-''}
+
+  case $what in
+  policies) consul acl policy list ;;
+  tokens) consul acl token list ;;
+  *) invalid_request ;;
   esac
   ;;
 get)
-  what=${2:?''}
+  what=${2:-''}
+
   case $what in
-  server-members)
+  info)
+    consul info
+    ;;
+  team)
     consul members
     ;;
-  admin-token)
+  consul-admin-token)
     consul_admin_token="${JAIL}/tokens/admin-consul.token.json"
     throw_if_file_doesnt_exist $consul_admin_token
     echo $(cat $consul_admin_token | jq -r ".SecretID")
@@ -137,7 +152,7 @@ get)
     throw_if_file_doesnt_exist $server_dns_Token
     echo $(cat $server_dns_Token | jq -r ".SecretID")
     ;;
-  server-node-token)
+  server-acl-token)
     server_node_token="${JAIL}/tokens/server-acl.token.json"
     throw_if_file_doesnt_exist $server_node_token
     echo $(cat $server_node_token | jq -r ".SecretID")
@@ -152,7 +167,7 @@ get)
   esac
   ;;
 create)
-  what=${2:?''}
+  what=${2:-''}
 
   case $what in
   consul_group)
@@ -180,6 +195,7 @@ create)
     consul acl token create \
       -node-identity "${svc_name}:us-east" \
       -service-identity="${svc_name}" \
+      -description="acl token for ${svc_name}" \
       --format json >${JAIL}/tokens/${svc_name}-acl.token.json 2>/dev/null
     ;;
   acl-token)
@@ -187,10 +203,12 @@ create)
 
     consul acl token create \
       -policy-name acl-policy-dns \
+      -description='core server dns token' \
       --format json >$JAIL/tokens/dns-acl.token.json
 
     consul acl token create \
       -policy-name acl-policy-server-node \
+      -description='core server acl token' \
       --format json >$JAIL/tokens/server-acl.token.json
     ;;
   policy)
@@ -205,8 +223,8 @@ create)
       -rules @$CONSUL_POLICY_DIR/acl-policy-server-node.hcl || true
 
     consul acl policy create \
-      -name 'acl-policy-web-proxy' \
-      -rules @$CONSUL_POLICY_DIR/acl-policy-web-proxy.hcl || true
+      -name 'acl-policy-core-proxy' \
+      -rules @$CONSUL_POLICY_DIR/acl-policy-core-proxy.hcl || true
     ;;
   *) invalid_request ;;
   esac
