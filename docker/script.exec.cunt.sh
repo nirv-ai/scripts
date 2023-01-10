@@ -31,15 +31,23 @@ exec_into_container() {
     exit 1
   fi
 
-  echo "trying to exec with bash: $1: $cunt_id\n"
-  if ! docker exec -it "$cunt_id" bash; then
+  local exec_args='-it'
+  local as_user=${2:-''}
+
+  if ! test -z $as_user; then
+    exec_args="$exec_args -u $as_user"
+  fi
+
+  local args="\n$1: $cunt_id\nargs: $exec_args"
+  echo "trying to exec with bash\n$args"
+  if ! docker exec $exec_args "$cunt_id" bash; then
     echo
-    echo "trying to exec with sh: $1: $cunt_id\n"
-    docker exec -it "$cunt_id" sh
+    echo "trying to exec with sh\n$args"
+    docker exec $exec_args "$cunt_id" sh
   fi
 }
 
 cunt_name=${1:?'container name is required'}
 case $cunt_name in
-*) exec_into_container ${cunt_name} ;;
+*) exec_into_container ${cunt_name} ${2:-''} ;;
 esac

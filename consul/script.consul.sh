@@ -6,7 +6,8 @@
 ## TODO: this file can use either the cli/http api
 ### ^ every node requires the consul binary anyway, unlike vault
 ## default files are owned by: systemd-network
-################ general flow: TODO move this into docs and automate like script.vault.sh
+################ general flow:
+# TODO: move this into docs and fkn automate this shiz script.vault.sh
 ### create rootca & server certs
 # create tokens rootca, server client & cli certs using script.ssl.sh
 # `create gossipkey`
@@ -29,7 +30,18 @@
 ### discovery: add configs for to each client machine
 # @see https://developer.hashicorp.com/consul/tutorials/get-started-vms/virtual-machine-gs-service-discovery
 # create a base discovery/client/config/* that can be used as defaults for each specific client service
-# copy base client configs/* into each discovery/service-name/config/* dir
+# create discovery/service-name/config/* configs
+# copy discovery/{client,service-name}/configs/* into each app/service-name/consul/src/config
+# validate each config has the data it needs
+# ^ `get service-acl-token core-proxy`
+# ^ `get team` >>> need the server ip for retry_join, for some reason setting hostname doesnt work
+# ^ reuse gossipkey, should be in jail/tls/gossipkey
+# ^^ TODO: gossipkey should be a symlink to /run/secrets
+# ^ (TODO: automate this)
+# sudo chown -R consul:consul app/svc-name/src/consul
+# ^ required due to secrets gid/uid bug, check CONSUL_{GID,UID} vars in compose .env
+# sudo rm -rf app/svc-name/src/consul/data/* if starting from scratch
+# script.reset|refresh compose_service_name(s) to boot consul clients
 
 set -euo pipefail
 
@@ -93,13 +105,13 @@ validate() {
 # consul kv get consul/configuration/db_port
 # dig @127.0.0.1 -p 8600 consul.service.consul
 # consul catalog services -tags
-# consul reload
 # consul services register svc-db.hcl
 
 # consul poop poop -h has wonderful examples, thank me later
 cmd=${1:-''}
 
 case $cmd in
+reload) consul reload ;;
 set)
   what=${2:?''}
 
@@ -173,6 +185,7 @@ create)
   consul_group)
     echo_debug "sudo required: adding $USER to group consul"
 
+    # TODO: copypasta how we do it in thebookofnoah
     sudo groupadd consul 2>/dev/null
     sudo usermod -aG consul $USER
     # sudo chown -R $USER:consul /etc/ssl/certs/development/consul
