@@ -4,6 +4,7 @@
 ## inspired by https://github.com/hashicorp-education/learn-consul-get-started-vms/tree/main/scripts
 ## TODO: must match the interface set by the other scripts
 ## TODO: this file can use either the cli/http api
+## default files are owned by: systemd-network
 ### ^ every node requires the consul binary anyway, unlike vault
 ################ general flow
 ### create rootca & server certs
@@ -26,6 +27,11 @@
 # server token: consul acl token create -description "server agent token" -policy-name acl-policy-server-node  --format json > ./server-acl-token.json
 # assign dns token to server: consul acl set-agent-token default ${DNS_TOKEN}
 # assign server token to server: consul acl set-agent-token agent ${SERVER_TOKEN}
+### update docker images to include binary (see proxy for ubuntu, vault for alpine)
+### discovery: add configs for to each client machine
+# @see https://developer.hashicorp.com/consul/tutorials/get-started-vms/virtual-machine-gs-service-discovery
+# create a base discovery/client/config/* that can be used as defaults for each specific client service
+# copy base client configs/* into each discovery/service-name/config/* dir
 
 set -euo pipefail
 
@@ -88,10 +94,35 @@ validate() {
 # consul kv put consul/configuration/db_port 5432
 # consul kv get consul/configuration/db_port
 # dig @127.0.0.1 -p 8600 consul.service.consul
+# consul catalog services -tags
+# consul reload
+# consul services register svc-db.hcl
 
+# consul poop poop -h has wonderful examples, thank me later
 cmd=${1:-''}
 
 case $cmd in
+set)
+  what=${2:?''}
+  case $what in
+  agent-tokens)
+    if test -z ${CONSUL_DNS_TOKEN:-''}; then
+      echo 'CONSUL_DNS_TOKEN not found in env`'
+      exit 1
+    fi
+
+    if test -z ${CONSUL_SERVER_NODE_TOKEN:-''}; then
+      echo 'CONSUL_SERVER_NODE_TOKEN not found in env`'
+      exit 1
+    fi
+
+    echo -e "TODO: setting static dns & server node tokens"
+
+    consul acl set-agent-token default ${CONSUL_DNS_TOKEN}
+    consul acl set-agent-token agent ${CONSUL_SERVER_NODE_TOKEN}
+    ;;
+  esac
+  ;;
 get)
   what=${2:?''}
   case $what in
@@ -135,6 +166,17 @@ create)
   consul-admin-token)
     mkdir -p $JAIL/tokens
     consul acl bootstrap --format json >$JAIL/tokens/admin-consul.token.json
+    ;;
+  service-token)
+    svc_name=${3:?'service name is required'}
+    echo 'TODO: creating static acl tokens'
+
+    mkdir -p $JAIL/tokens
+
+    consul acl token create \
+      -node-identity "${svc_name}:us-east" \
+      -service-identity="${svc_name}" \
+      --format json >${JAIL}/tokens/${svc_name}-acl-token.json 2>/dev/null
     ;;
   acl-token)
     echo 'TODO: creating static acl tokens'
