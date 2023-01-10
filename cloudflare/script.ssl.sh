@@ -5,7 +5,7 @@
 ## @see https://github.com/cloudflare/cfssl/wiki/Creating-a-new-CSR
 ## nomad & consul use the same certificate pattern
 ## server.DATACENTER.DOMAIN for server certs
-## client.DATACENTER.DOMAIN for client serts
+## SVC_NAME.DATACENTER.DOMAIN for client serts
 ## CLI certs use client certs
 ######
 
@@ -105,6 +105,7 @@ create)
     chmod 0640 $JAIL/*key.pem
     ;;
   client)
+    svc_name=${3:?'svc_name is required'}
     echo "creating client certificate"
     CA_CERT="${JAIL}/ca.pem"
     CA_PRIVKEY="${JAIL}/ca-key.pem"
@@ -115,7 +116,7 @@ create)
       -ca-key=$CA_PRIVKEY \
       -config=$CLIENT_CONFIG \
       ./mesh.client.csr.json |
-      cfssljson -bare "${JAIL}/client"
+      cfssljson -bare "${JAIL}/${svc_name}"
 
     chmod 0644 $JAIL/*.pem
     chmod 0640 $JAIL/*key.pem
