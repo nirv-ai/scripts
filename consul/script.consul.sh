@@ -23,8 +23,8 @@
 # see policy dir
 # dns policy: consul acl policy create -name 'acl-policy-dns' -description 'Policy for DNS endpoints' -rules @./acl-policy-dns.hcl
 # server policy: consul acl policy create -name 'acl-policy-server-node' -description 'Policy for Server nodes' -rules @./acl-policy-server-node.hcl
-# dns token: consul acl token create -description 'DNS - Default token' -policy-name acl-policy-dns --format json > ./acl-token-dns.json
-# server token: consul acl token create -description "server agent token" -policy-name acl-policy-server-node  --format json > ./server-acl-token.json
+# dns token: consul acl token create -description 'DNS - Default token' -policy-name acl-policy-dns --format json > ./dns-acl.token.json
+# server token: consul acl token create -description "server agent token" -policy-name acl-policy-server-node  --format json > ./server-acl.token.json
 # assign dns token to server: consul acl set-agent-token default ${DNS_TOKEN}
 # assign server token to server: consul acl set-agent-token agent ${SERVER_TOKEN}
 ### update docker images to include binary (see proxy for ubuntu, vault for alpine)
@@ -135,12 +135,18 @@ get)
     echo $(cat $consul_admin_token | jq -r ".SecretID")
     ;;
   dns-token)
-    server_dns_Token="${JAIL}/tokens/acl-token-dns.json"
+    server_dns_Token="${JAIL}/tokens/dns-acl.token.json"
     throw_if_file_doesnt_exist $server_dns_Token
     echo $(cat $server_dns_Token | jq -r ".SecretID")
     ;;
   server-node-token)
-    server_node_token="${JAIL}/tokens/server-acl-token.json"
+    server_node_token="${JAIL}/tokens/server-acl.token.json"
+    throw_if_file_doesnt_exist $server_node_token
+    echo $(cat $server_node_token | jq -r ".SecretID")
+    ;;
+  service-acl-token)
+    svc_name=${3:?'svc_name required'}
+    server_node_token="${JAIL}/tokens/${svc_name}-acl.token.json"
     throw_if_file_doesnt_exist $server_node_token
     echo $(cat $server_node_token | jq -r ".SecretID")
     ;;
@@ -176,18 +182,18 @@ create)
     consul acl token create \
       -node-identity "${svc_name}:us-east" \
       -service-identity="${svc_name}" \
-      --format json >${JAIL}/tokens/${svc_name}-acl-token.json 2>/dev/null
+      --format json >${JAIL}/tokens/${svc_name}-acl.token.json 2>/dev/null
     ;;
   acl-token)
     echo 'TODO: creating static acl tokens'
 
     consul acl token create \
       -policy-name acl-policy-dns \
-      --format json >$JAIL/tokens/acl-token-dns.json
+      --format json >$JAIL/tokens/dns-acl.token.json
 
     consul acl token create \
       -policy-name acl-policy-server-node \
-      --format json >$JAIL/tokens/server-acl-token.json
+      --format json >$JAIL/tokens/server-acl.token.json
     ;;
   policy)
     echo -e 'TODO: creating static policies\n\n'
