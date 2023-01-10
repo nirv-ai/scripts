@@ -26,13 +26,13 @@
 # see policy dir
 # `create policy`
 # `list policies`
-# `create acl-token`
-# `create server-token svc-name` # never use _ in service names, must match svc configs
+# `create acl-token` >>> put known services here for now
+# `create server-token svc-name` # for testing new services never use _ in service names, must match svc configs
 # `. .env.consul.server`
 # `list tokens`
 # `set agent-tokens` >>> from [WARN] agent: ...blocked by acls... --> to agent: synced node info
 ### update docker images to include binary (see proxy for ubuntu, vault for alpine)
-### discovery: add configs for to each client machine
+### DISCOVERY: add configs for to each client machine
 # @see https://developer.hashicorp.com/consul/tutorials/get-started-vms/virtual-machine-gs-service-discovery
 # create a base discovery/client/config/* that can be used as defaults for each specific client service
 # create discovery/service-name/config/* configs
@@ -47,6 +47,7 @@
 # ^ required due to secrets gid/uid bug, check CONSUL_{GID,UID} vars in compose .env
 # sudo rm -rf app/svc-name/src/consul/data/* if starting from scratch
 # script.reset|refresh compose_service_name(s) to boot consul clients
+### MESH: this is a migration from discovery to mesh
 
 set -euo pipefail
 
@@ -210,19 +211,25 @@ create)
     consul acl policy create \
       -name 'acl-policy-core-proxy' \
       -rules @$CONSUL_POLICY_DIR/acl-policy-core-proxy.hcl || true
+
+    consul acl policy create \
+      -name 'acl-policy-core-vault' \
+      -rules @$CONSUL_POLICY_DIR/acl-policy-core-vault.hcl || true
     ;;
   service-token)
     # reuse existing things if resetting data|configs
     # -secret=<string>
     # -role-name=<value>
     svc_name=${3:?'service name is required'}
+    policy_name=${4:?'policy name is required'}
     echo 'TODO: creating static acl tokens'
 
     mkdir -p $JAIL/tokens
 
     consul acl token create \
-      -node-identity "${svc_name}:us-east" \
+      -node-identity="${svc_name}:us-east" \
       -service-identity="${svc_name}" \
+      -policy-name="$policy_name" \
       -description="acl token for ${svc_name}" \
       --format json >${JAIL}/tokens/${svc_name}-acl.token.json 2>/dev/null
     ;;
@@ -230,15 +237,29 @@ create)
     # reuse existing things if resetting data|configs
     # -secret=<string>
     # -role-name=<value>
-    echo 'TODO: creating static acl tokens'
+    echo 'TODO: creating static acl tokens for known services'
 
     consul acl token create \
-      -policy-name acl-policy-dns \
+      -node-identity="core-proxy:us-east" \
+      -service-identity="core-proxy" \
+      -policy-name="acl-policy-core-proxy" \
+      -description="acl token for core-proxy" \
+      --format json >${JAIL}/tokens/core-proxy-acl.token.json 2>/dev/null
+
+    consul acl token create \
+      -node-identity="core-vault:us-east" \
+      -service-identity="core-vault" \
+      -policy-name="acl-policy-core-vault" \
+      -description="acl token for core-vault" \
+      --format json >${JAIL}/tokens/core-vault-acl.token.json 2>/dev/null
+
+    consul acl token create \
+      -policy-name='acl-policy-dns' \
       -description='core server dns token' \
       --format json >$JAIL/tokens/dns-acl.token.json
 
     consul acl token create \
-      -policy-name acl-policy-server-node \
+      -policy-name='acl-policy-server-node' \
       -description='core server acl token' \
       --format json >$JAIL/tokens/server-acl.token.json
     ;;
