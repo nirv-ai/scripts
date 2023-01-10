@@ -19,12 +19,10 @@
 # should not receive any errors
 # log in through the UI using the admin token: script.consul.sh get admin-token
 # should have access to almost everything
-### create policy files and push to consul server
+### create policy files and tokens and push to consul server
 # see policy dir
-# dns policy: consul acl policy create -name 'acl-policy-dns' -description 'Policy for DNS endpoints' -rules @./acl-policy-dns.hcl
-# server policy: consul acl policy create -name 'acl-policy-server-node' -description 'Policy for Server nodes' -rules @./acl-policy-server-node.hcl
-# dns token: consul acl token create -description 'DNS - Default token' -policy-name acl-policy-dns --format json > ./dns-acl.token.json
-# server token: consul acl token create -description "server agent token" -policy-name acl-policy-server-node  --format json > ./server-acl.token.json
+# see cmd: create policy
+# see cmd: create *token(s)
 # assign dns token to server: consul acl set-agent-token default ${DNS_TOKEN}
 # assign server token to server: consul acl set-agent-token agent ${SERVER_TOKEN}
 ### update docker images to include binary (see proxy for ubuntu, vault for alpine)
@@ -200,11 +198,15 @@ create)
 
     consul acl policy create \
       -name 'acl-policy-dns' \
-      -rules @$CONSUL_POLICY_DIR/acl-policy-dns.hcl 2>/dev/null
+      -rules @$CONSUL_POLICY_DIR/acl-policy-dns.hcl || true
 
     consul acl policy create \
       -name 'acl-policy-server-node' \
-      -rules @$CONSUL_POLICY_DIR/acl-policy-server-node.hcl 2>/dev/null
+      -rules @$CONSUL_POLICY_DIR/acl-policy-server-node.hcl || true
+
+    consul acl policy create \
+      -name 'acl-policy-web-proxy' \
+      -rules @$CONSUL_POLICY_DIR/acl-policy-web-proxy.hcl || true
     ;;
   *) invalid_request ;;
   esac
