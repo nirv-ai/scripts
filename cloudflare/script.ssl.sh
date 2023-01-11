@@ -3,7 +3,7 @@
 ######
 ## @see https://developer.hashicorp.com/nomad/tutorials/transport-security/security-enable-tls#node-certificates
 ## @see https://github.com/cloudflare/cfssl/wiki/Creating-a-new-CSR
-## nomad & consul use the same certificate pattern
+## nomad & consul use the same certificate pattern, so shall we
 ## server.DATACENTER.DOMAIN for server certs
 ## SVC_NAME.DATACENTER.DOMAIN for client serts
 ## CLI certs use client certs
@@ -11,45 +11,52 @@
 
 set -euo pipefail
 
-if ! type cfssl 2>&1 >/dev/null; then
-  echo -e "install cfssl before continuing: \nhttps://github.com/cloudflare/cfssl#installation"
-  echo -e "\nsudo apt install golang-cfssl"
-fi
+######################## INTERFACE
+NIRV_SCRIPT_DEBUG="${NIRV_SCRIPT_DEBUG:-1}"
+DOCS_URI='https://github.com/nirv-ai/docs/blob/main/cfssl/README.md'
 
-# INTERFACE
-## locations
-SSL_CN=${SSL_CN:-"mesh.nirv.ai"}
-ENV=${ENV:-'development'}
-BASE_DIR=$(pwd)
-JAIL="${BASE_DIR}/secrets/${SSL_CN}/${ENV}/tls"
+SCRIPTS_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]%/}")" &>/dev/null && pwd)
+SCRIPTS_DIR_PARENT=$(dirname $SCRIPTS_DIR)
 
-######################## ERROR HANDLING
-DEBUG="${NIRV_SCRIPT_DEBUG:-1}"
-echo_debug() {
-  if [ "$DEBUG" = 1 ]; then
-    echo -e '\n\n[DEBUG] SCRIPT.CONSUL.SH\n------------'
-    echo -e "$@"
-    echo -e "------------\n\n"
-  fi
-}
-invalid_request() {
-  local INVALID_REQUEST_MSG="invalid request: @see https://github.com/nirv-ai/docs/blob/main/cloudflare/README.md"
+CONFIG_DIR_NAME=${CONFIG_DIR_NAME:-'configs'}
+SECRET_DIR_NAME=${SECRET_DIR_NAME:-'secrets'}
+CA_CN=${CA_CN:-'mesh.nirv.ai'}
 
-  echo_debug $INVALID_REQUEST_MSG
-}
-throw_if_file_doesnt_exist() {
-  if test ! -f "$1"; then
-    echo -e "file doesnt exist: $1"
-    exit 1
-  fi
-}
-throw_if_dir_doesnt_exist() {
-  if test ! -d "$1"; then
-    echo -e "directory doesnt exist: $1"
-    exit 1
-  fi
-}
+JAIL="${SCRIPTS_DIR_PARENT}/${SECRET_DIR_NAME}/${CA_CN}"
+CONFIG_DIR="${SCRIPTS_DIR_PARENT}/${CONFIG_DIR_NAME}/cfssl"
 
+declare -A EFFECTIVE_INTERFACE=(
+  [CA_CN]=$CA_CN
+  [CONFIG_DIR]=$CONFIG_DIR
+  [JAIL]=$JAIL
+  [SCRIPTS_DIR_PARENT]=$SCRIPTS_DIR_PARENT
+  [SCRIPTS_DIR]=$SCRIPTS_DIR
+)
+
+######################## UTILS
+for util in $SCRIPTS_DIR/utils/*.sh; do
+  source $util
+done
+
+######################## CREDIT CHECK
+echo_debug_interface
+throw_missing_program cfssl 400 "sudo apt install golang-cfssl"
+throw_missing_dir $JAIL 400 "mkdir -p $JAIL"
+
+######################## FNS
+## reusable
+create_tls_dir() {
+  mkdir -p $JAIL/tls
+}
+chmod_cert_files() {
+  throw_missing_dir $JAIL/tlx 500 "\$JAIL/tls should exist before calling this fn"
+
+  sudo chmod 0644 $JAIL/*.pem
+  sudo chmod 0640 $JAIL/*key.pem
+}
+## workflows
+######################## PROGRAM
+chmod_cert_files
 cmd=${1:-''}
 
 case $cmd in
