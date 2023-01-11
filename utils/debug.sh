@@ -4,9 +4,9 @@ set -euo pipefail
 
 echo_debug() {
   if [ "$NIRV_SCRIPT_DEBUG" = 1 ]; then
-    echo -e "\n\n[DEBUG] $0\n------------------------"
+    echo -e "\n\n[DEBUG] $0\n------------------------\n"
     echo -e "$@"
-    echo -e "------------------------\n\n"
+    echo -e "\n------------------------\n\n"
   fi
 }
 echo_debug_interface() {
