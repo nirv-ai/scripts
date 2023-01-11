@@ -5,7 +5,7 @@
 set -euo pipefail
 
 # required
-REG_CERTS_PATH=${REG_CERTS_PATH:-'/etc/ssl/certs'}
+REG_CERTS_DIR_CUNT=${REG_CERTS_DIR_CUNT:-'/etc/ssl/certs'}
 
 # optional
 REG_DOMAIN=${REG_DOMAIN:-nirv.ai}
@@ -39,10 +39,10 @@ push_img() {
 run_reg() {
   volumes
 
-  real_certs_path="$REG_CERTS_PATH"
-  if ! test -d "$real_certs_path"; then
+  real_CERTS_DIR_CUNT="$REG_CERTS_DIR_CUNT"
+  if ! test -d "$real_CERTS_DIR_CUNT"; then
     echo
-    echo "$real_certs_path not found"
+    echo "$real_CERTS_DIR_CUNT not found"
     exit 1
   fi
 
@@ -53,7 +53,7 @@ run_reg() {
   echo
   echo "creating registry: $REG_NAME on $portmap"
   echo "\tstore: $REG_VOL_NAME"
-  echo "\tcerts: $real_certs_path"
+  echo "\tcerts: $real_CERTS_DIR_CUNT"
 
   docker run -d -p $portmap \
     --name $REG_NAME \
@@ -62,7 +62,7 @@ run_reg() {
     -e REGISTRY_HTTP_TLS_CERTIFICATE=$CUNT_LIVE_CERT_PATH/fullchain.pem \
     -e REGISTRY_HTTP_TLS_KEY=$CUNT_LIVE_CERT_PATH/privkey.pem \
     -v "$REG_VOL_NAME:/var/lib/registry" \
-    -v "$real_certs_path:$CUNT_CERT_PATH" \
+    -v "$real_CERTS_DIR_CUNT:$CUNT_CERT_PATH" \
     registry:2
 
   if [ "$?" -ne 0 ]; then
