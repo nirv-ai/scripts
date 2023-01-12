@@ -16,7 +16,7 @@ CLI_NAME="${CLI_NAME:-cli}"
 CLIENT_NAME="${CLIENT_NAME:-client}"
 CONFIG_DIR_NAME="${CONFIG_DIR_NAME:-configs}"
 DOCS_URI='https://github.com/nirv-ai/docs/blob/main/cfssl/README.md'
-NIRV_SCRIPT_DEBUG="${NIRV_SCRIPT_DEBUG:-1}"
+NIRV_SCRIPT_DEBUG="${NIRV_SCRIPT_DEBUG:-0}"
 SCRIPTS_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]%/}")" &>/dev/null && pwd)
 SECRET_DIR_NAME="${SECRET_DIR_NAME:-secrets}"
 SERVER_NAME="${SERVER_NAME:-server}"
@@ -24,13 +24,13 @@ TLS_DIR_NAME="${TLS_DIR_NAME:-tls}"
 
 SCRIPTS_DIR_PARENT=$(dirname $SCRIPTS_DIR)
 
-CFSSL_DIR="${SCRIPTS_DIR_PARENT}/${CONFIG_DIR_NAME}/cfssl"
-JAIL="${SCRIPTS_DIR_PARENT}/${SECRET_DIR_NAME}/${CA_CN}"
+CFSSL_DIR="${CFSSL_DIR:-$SCRIPTS_DIR_PARENT/$CONFIG_DIR_NAME/cfssl}"
+JAIL="${JAIL:-$SCRIPTS_DIR_PARENT/$SECRET_DIR_NAME/$CA_CN}"
 
-JAIL_TLS="${JAIL}/${TLS_DIR_NAME}"
+JAIL_TLS="${JAIL_TLS:-$JAIL/$TLS_DIR_NAME}"
 
-CA_CERT="${JAIL_TLS}/${CA_PEM_NAME}.pem"
-CA_PRIVKEY="${JAIL_TLS}/${CA_PEM_NAME}-key.pem"
+CA_CERT="${CA_CERT:-$JAIL_TLS/$CA_PEM_NAME}.pem"
+CA_PRIVKEY="${CA_PRIVKEY:-$JAIL_TLS/$CA_PEM_NAME}-key.pem"
 
 declare -A EFFECTIVE_INTERFACE=(
   [CA_CERT]=$CA_CERT
@@ -185,7 +185,7 @@ create_cli_cert() {
     throw_missing_file $CFFSL_CONFIG 400 'couldnt find default cfssl config'
   fi
 
-  echo_debug "creating $total client certificates"
+  echo_debug "creating $total cli certificates"
 
   i=0
   while [ $i -lt $total ]; do
@@ -207,21 +207,21 @@ cmd=${1:-''}
 
 case $cmd in
 info)
-  who=${2:-''}
-  case $who in
-  rootca)
-    what=${3:-''}
-    case $what in
-    cert)
-      echo -e "\ninfo about cert & pubkey\n\n"
-      cfssl certinfo -cert $JAIL/ca.pem
-      ;;
-    csr)
-      echo "info about csr"
-      cfssl certinfo -csr $JAIL/ca.csr
-      ;;
-    *) invalid_request ;;
-    esac
+  what=${2:-''}
+  case $what in
+  cert)
+    pem_file="${JAIL_TLS}/${3:?'pem name is required'}.pem"
+    throw_missing_file $pem_file 400 'couldnt find local cert file'
+
+    echo_debug 'retrieving data from local certificate file'
+    cfssl certinfo -cert $pem_file
+    ;;
+  csr)
+    csr_file="${JAIL_TLS}/${3:?'csr name is required'}.csr"
+    throw_missing_file $csr_file 400 'couldnt find local csr file'
+
+    echo_debug 'retrieving data from local CSR file'
+    cfssl certinfo -csr $csr_file
     ;;
   *) invalid_request ;;
   esac
