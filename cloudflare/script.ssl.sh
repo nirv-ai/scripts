@@ -8,6 +8,11 @@
 set -euo pipefail
 
 ######################## INTERFACE
+DOCS_URI='https://github.com/nirv-ai/docs/blob/main/cfssl/README.md'
+NIRV_SCRIPT_DEBUG="${NIRV_SCRIPT_DEBUG:-0}"
+SCRIPTS_DIR_PARENT=$(dirname $SCRIPTS_DIR)
+SCRIPTS_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]%/}")" &>/dev/null && pwd)
+
 # grouped by increasing order of dependency
 CA_CN="${CA_CN:-mesh.nirv.ai}"
 CA_PEM_NAME="${CA_PEM_NAME:-ca}"
@@ -15,14 +20,9 @@ CFSSL_CONFIG_NAME="${CFSSL_CONFIG_NAME:-cfssl.json}"
 CLI_NAME="${CLI_NAME:-cli}"
 CLIENT_NAME="${CLIENT_NAME:-client}"
 CONFIG_DIR_NAME="${CONFIG_DIR_NAME:-configs}"
-DOCS_URI='https://github.com/nirv-ai/docs/blob/main/cfssl/README.md'
-NIRV_SCRIPT_DEBUG="${NIRV_SCRIPT_DEBUG:-0}"
-SCRIPTS_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]%/}")" &>/dev/null && pwd)
 SECRET_DIR_NAME="${SECRET_DIR_NAME:-secrets}"
 SERVER_NAME="${SERVER_NAME:-server}"
 TLS_DIR_NAME="${TLS_DIR_NAME:-tls}"
-
-SCRIPTS_DIR_PARENT=$(dirname $SCRIPTS_DIR)
 
 CFSSL_DIR="${CFSSL_DIR:-$SCRIPTS_DIR_PARENT/$CONFIG_DIR_NAME/cfssl}"
 JAIL="${JAIL:-$SCRIPTS_DIR_PARENT/$SECRET_DIR_NAME/$CA_CN}"

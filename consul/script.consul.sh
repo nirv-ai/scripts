@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 
+set -euo pipefail
+
 ################
-## inspired by https://github.com/hashicorp-education/learn-consul-get-started-vms/tree/main/scripts
+## inspired by
 ## TODO: must match the interface set by the other scripts
 ## TODO: this file can use either the cli/http api
 ### ^ every node requires the consul binary anyway, unlike vault
@@ -49,56 +51,30 @@
 # script.reset|refresh compose_service_name(s) to boot consul clients
 ### MESH: this is a migration from discovery to mesh
 
-set -euo pipefail
+######################## INTERFACE
+DOCS_URI='https://github.com/nirv-ai/docs/blob/main/consul/README.md'
+SCRIPTS_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]%/}")" &>/dev/null && pwd)"
+SCRIPTS_DIR_PARENT="$(dirname $SCRIPTS_DIR)"
+NIRV_SCRIPT_DEBUG="${NIRV_SCRIPT_DEBUG:-1}"
 
-# INTERFACE
-## locations
-BASE_DIR=$(pwd)
-REPO_DIR=$BASE_DIR/core
-APPS_DIR=$REPO_DIR/apps
+# grouped by increasing order of dependency
+APP_PREFIX='nirvai'
+CONSUL_INSTANCE_DIR_NAME='core-consul'
+CONSUL_SERVICE_NAME=core_consul
+DATACENTER=us-east
+JAIL="${SCRIPTS_DIR_PARENT}/secrets/mesh.nirv.ai/"
+MESH_HOSTNAME=mesh.nirv.ai
+REPO_DIR="${SCRIPTS_DIR_PARENT}/core"
 
-APP_PREFIX=nirvai
-ENV=development
-CONSUL_INSTANCE_DIR_NAME=core-consul
-CONSUL_INSTANCE_SRC_DIR=$APPS_DIR/$APP_PREFIX-$CONSUL_INSTANCE_DIR_NAME/src
+APPS_DIR="${REPO_DIR}/apps"
+
+CONSUL_INSTANCE_SRC_DIR="${APPS_DIR}/${APP_PREFIX}-${CONSUL_INSTANCE_DIR_NAME}/src"
+
 CONSUL_DATA_DIR="${CONSUL_INSTANCE_SRC_DIR}/data"
 CONSUL_INSTANCE_CONFIG_DIR="${CONSUL_INSTANCE_SRC_DIR}/config"
 CONSUL_POLICY_DIR="${CONSUL_INSTANCE_SRC_DIR}/policy"
-JAIL="${BASE_DIR}/secrets/mesh.nirv.ai/${ENV}"
-
-## vars
-CONSUL_SERVICE_NAME=core_consul
-DATACENTER=us-east
-DEBUG="${NIRV_SCRIPT_DEBUG:-1}"
-MESH_HOSTNAME=mesh.nirv.ai
 
 # CONSUL_CONFIG_TARGET="${CONSUL_INSTANCE_CONFIG_DIR}/${CONSUL_CONFIG_TARGET:-''}"
-
-######################## ERROR HANDLING
-echo_debug() {
-  if [ "$DEBUG" = 1 ]; then
-    echo -e '\n\n[DEBUG] SCRIPT.CONSUL.SH\n------------'
-    echo -e "$@"
-    echo -e "------------\n\n"
-  fi
-}
-invalid_request() {
-  local INVALID_REQUEST_MSG="invalid request: @see https://github.com/nirv-ai/docs/blob/main/README.md"
-
-  echo_debug $INVALID_REQUEST_MSG
-}
-throw_if_file_doesnt_exist() {
-  if test ! -f "$1"; then
-    echo -e "file doesnt exist: $1"
-    exit 1
-  fi
-}
-throw_if_dir_doesnt_exist() {
-  if test ! -d "$1"; then
-    echo -e "directory doesnt exist: $1"
-    exit 1
-  fi
-}
 
 ######################## utils
 validate() {
@@ -162,23 +138,23 @@ get)
     ;;
   consul-admin-token)
     consul_admin_token="${JAIL}/tokens/admin-consul.token.json"
-    throw_if_file_doesnt_exist $consul_admin_token
+    throw_missing_file $consul_admin_token
     echo $(cat $consul_admin_token | jq -r ".SecretID")
     ;;
   dns-token)
     server_dns_Token="${JAIL}/tokens/dns-acl.token.json"
-    throw_if_file_doesnt_exist $server_dns_Token
+    throw_missing_file $server_dns_Token
     echo $(cat $server_dns_Token | jq -r ".SecretID")
     ;;
   server-acl-token)
     server_node_token="${JAIL}/tokens/server-acl.token.json"
-    throw_if_file_doesnt_exist $server_node_token
+    throw_missing_file $server_node_token
     echo $(cat $server_node_token | jq -r ".SecretID")
     ;;
   service-acl-token)
     svc_name=${3:?'svc_name required'}
     server_node_token="${JAIL}/tokens/${svc_name}-acl.token.json"
-    throw_if_file_doesnt_exist $server_node_token
+    throw_missing_file $server_node_token
     echo $(cat $server_node_token | jq -r ".SecretID")
     ;;
   *) invalid_request ;;
@@ -189,7 +165,7 @@ create)
 
   case $what in
   gossipkey)
-    throw_if_dir_doesnt_exist $JAIL
+    throw_missing_dir $JAIL
     mkdir -p $JAIL/tls
     consul keygen >$JAIL/tls/gossipkey
     ;;
