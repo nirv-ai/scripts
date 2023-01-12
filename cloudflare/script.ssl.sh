@@ -142,7 +142,7 @@ create_client_cert() {
 
   if test -n ${5:-''}; then
     local CFFSL_CONFIG="${CN_CONFIG_DIR}/$5"
-    throw_missing_file $CFFSL_CONFIG 400 'couldnt find server cfssl config'
+    throw_missing_file $CFFSL_CONFIG 400 'couldnt find client cfssl config'
   else
     local CFFSL_CONFIG="${CFSSL_DIR}/${CFSSL_CONFIG_NAME}"
     throw_missing_file $CFFSL_CONFIG 400 'couldnt find default cfssl config'
@@ -164,9 +164,45 @@ create_client_cert() {
   chmod_cert_files
 }
 
-## workflows
-######################## PROGRAM
+create_cli_cert() {
+  local total=${1:-1}
+  local CA_CN=${2:-$CA_CN}
+  local CA_PEM_NAME=${3:-$CA_PEM_NAME}
+  local CLI_NAME=${4:-$CLI_NAME}
 
+  local CA_CERT="${JAIL_TLS}/${CA_PEM_NAME}.pem"
+  local CA_PRIVKEY="${JAIL_TLS}/${CA_PEM_NAME}-key.pem"
+  local CN_CONFIG_DIR="${CFSSL_DIR}/${CA_CN}"
+
+  local CLI_CONFIG="${CN_CONFIG_DIR}/csr.cli.${CLI_NAME}.json"
+  throw_missing_file $CLI_CONFIG 400 'couldnt find cli csr config'
+
+  if test -n ${5:-''}; then
+    local CFFSL_CONFIG="${CN_CONFIG_DIR}/$5"
+    throw_missing_file $CFFSL_CONFIG 400 'couldnt find cli cfssl config'
+  else
+    local CFFSL_CONFIG="${CFSSL_DIR}/${CFSSL_CONFIG_NAME}"
+    throw_missing_file $CFFSL_CONFIG 400 'couldnt find default cfssl config'
+  fi
+
+  echo_debug "creating $total client certificates"
+
+  i=0
+  while [ $i -lt $total ]; do
+    cfssl gencert \
+      -ca=$CA_CERT \
+      -ca-key=$CA_PRIVKEY \
+      -config=$CFFSL_CONFIG \
+      -profile=client \
+      $CLI_CONFIG |
+      cfssljson -bare "${JAIL_TLS}/$CLI_NAME-${i}"
+    i=$((i + 1))
+  done
+
+  chmod_cert_files
+}
+
+######################## PROGRAM
 cmd=${1:-''}
 
 case $cmd in
@@ -228,21 +264,18 @@ create)
       $use_cfssl_config
     ;;
   cli)
-    echo "creating command line certificate"
-    CA_CERT="${JAIL}/ca.pem"
-    CA_PRIVKEY="${JAIL}/ca-key.pem"
-    CLI_CONFIG="${JAIL}/cfssl.json"
+    use_total=${3:-''}
+    use_ca_cn=${4:-''}
+    use_ca_pem_name=${5:-''}
+    use_cli_name=${6:-''}
+    use_cfssl_config=${7-''}
 
-    cfssl gencert \
-      -ca=$CA_CERT \
-      -ca-key=$CA_PRIVKEY \
-      -config=$CLI_CONFIG \
-      -profile=client \
-      ./mesh.cli.csr.json |
-      cfssljson -bare "${JAIL}/cli"
-
-    sudo chmod 0644 $JAIL/*.pem
-    sudo chmod 0640 $JAIL/*key.pem
+    create_cli_cert \
+      $use_total \
+      $use_ca_cn \
+      $use_ca_pem_name \
+      $use_cli_name \
+      $use_cfssl_config
     ;;
   *) invalid_request ;;
   esac
