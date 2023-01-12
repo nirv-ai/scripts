@@ -3,12 +3,16 @@
 ## ^ was required for using letsencrypt certs with haproxy tls
 ## not required for hashicorp vault
 
+# TODO: you can do better than this script
+
 set -e
 
-for file in ./live/dev.nirv.ai/*.pem; do
+DOMAIN=${DOMAIN:-'dev.nirv.ai'}
+
+for file in ./live/$DOMAIN/*.pem; do
   openssl x509 -in $file -text || true
 done
 
 echo 'creating combined fullchain + priv key pem file as combined.pem'
-cat ./live/dev.nirv.ai/fullchain.pem ./live/dev.nirv.ai/privkey.pem >./live/dev.nirv.ai/combined.pem
-ls ./live/dev.nirv.ai
+cat ./live/$DOMAIN/fullchain.pem ./live/$DOMAIN/privkey.pem >./live/$DOMAIN/combined.pem
+ls ./live/$DOMAIN
