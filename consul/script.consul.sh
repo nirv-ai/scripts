@@ -60,24 +60,57 @@ NIRV_SCRIPT_DEBUG="${NIRV_SCRIPT_DEBUG:-1}"
 # grouped by increasing order of dependency
 APP_PREFIX='nirvai'
 CONSUL_INSTANCE_DIR_NAME='core-consul'
-CONSUL_SERVICE_NAME=core_consul
+CONSUL_SERVICE_NAME=core-consul
 DATACENTER=us-east
-JAIL="${SCRIPTS_DIR_PARENT}/secrets/mesh.nirv.ai/"
+JAIL="${SCRIPTS_DIR_PARENT}/secrets"
 MESH_HOSTNAME=mesh.nirv.ai
 REPO_DIR="${SCRIPTS_DIR_PARENT}/core"
 
 APPS_DIR="${REPO_DIR}/apps"
+JAIL_TLS="${JAIL}/${MESH_HOSTNAME}/tls"
+JAIL_TOKENS="${JAIL}/${MESH_HOSTNAME}/tokens"
 
 CONSUL_INSTANCE_SRC_DIR="${APPS_DIR}/${APP_PREFIX}-${CONSUL_INSTANCE_DIR_NAME}/src"
 
-CONSUL_DATA_DIR="${CONSUL_INSTANCE_SRC_DIR}/data"
+CONSUL_INSTANCE_DATA_DIR="${CONSUL_INSTANCE_SRC_DIR}/data"
 CONSUL_INSTANCE_CONFIG_DIR="${CONSUL_INSTANCE_SRC_DIR}/config"
-CONSUL_POLICY_DIR="${CONSUL_INSTANCE_SRC_DIR}/policy"
+CONSUL_INSTANCE_POLICY_DIR="${CONSUL_INSTANCE_SRC_DIR}/policy"
 
 # CONSUL_CONFIG_TARGET="${CONSUL_INSTANCE_CONFIG_DIR}/${CONSUL_CONFIG_TARGET:-''}"
 
-######################## utils
-validate() {
+declare -A EFFECTIVE_INTERFACE=(
+  [CONSUL_INSTANCE_CONFIG_DIR]=$CONSUL_INSTANCE_CONFIG_DIR
+  [CONSUL_INSTANCE_DATA_DIR]=$CONSUL_INSTANCE_DATA_DIR
+  [CONSUL_INSTANCE_POLICY_DIR]=$CONSUL_INSTANCE_POLICY_DIR
+  [DATACENTER]=$DATACENTER
+  [JAIL_TLS]=$JAIL_TLS
+  [JAIL_TOKENS]=$JAIL_TOKENS
+
+  [CLI_NAME]=$CLI_NAME
+  [CLIENT_NAME]=$CLIENT_NAME
+  [JAIL_TLS]=$JAIL_TLS
+  [SCRIPTS_DIR_PARENT]=$SCRIPTS_DIR_PARENT
+  [SCRIPTS_DIR]=$SCRIPTS_DIR
+  [SERVER_NAME]=$SERVER_NAME
+)
+
+######################## UTILS
+for util in $SCRIPTS_DIR/utils/*.sh; do
+  source $util
+done
+
+######################## CREDIT CHECK
+echo_debug_interface
+
+throw_missing_program cfssl 400 'sudo apt install golang-cfssl'
+throw_missing_program cfssljson 400 'sudo apt install golang-cfssl'
+throw_missing_program jq 400 'sudo apt install jq'
+
+throw_missing_dir $CFSSL_DIR 400 'cant find certificate authority configuration files'
+throw_missing_dir $JAIL 400 "mkdir -p $JAIL"
+
+######################## FNS
+validate_consul() {
   file_or_dir=${1:-'file or directory required for validation'}
 
   consule validate $1
@@ -138,23 +171,23 @@ get)
     ;;
   consul-admin-token)
     consul_admin_token="${JAIL}/tokens/admin-consul.token.json"
-    throw_missing_file $consul_admin_token
+    throw_missing_file $consul_admin_token 400 'cant find admin token token'
     echo $(cat $consul_admin_token | jq -r ".SecretID")
     ;;
   dns-token)
     server_dns_Token="${JAIL}/tokens/dns-acl.token.json"
-    throw_missing_file $server_dns_Token
+    throw_missing_file $server_dns_Token 400 'couldnt find dns token'
     echo $(cat $server_dns_Token | jq -r ".SecretID")
     ;;
   server-acl-token)
     server_node_token="${JAIL}/tokens/server-acl.token.json"
-    throw_missing_file $server_node_token
+    throw_missing_file $server_node_token 400 'cant find server token'
     echo $(cat $server_node_token | jq -r ".SecretID")
     ;;
   service-acl-token)
     svc_name=${3:?'svc_name required'}
     server_node_token="${JAIL}/tokens/${svc_name}-acl.token.json"
-    throw_missing_file $server_node_token
+    throw_missing_file $server_node_token 'cant find service token'
     echo $(cat $server_node_token | jq -r ".SecretID")
     ;;
   *) invalid_request ;;
@@ -165,7 +198,7 @@ create)
 
   case $what in
   gossipkey)
-    throw_missing_dir $JAIL
+    throw_missing_dir $JAIL 400 'local jail required'
     mkdir -p $JAIL/tls
     consul keygen >$JAIL/tls/gossipkey
     ;;
