@@ -10,8 +10,9 @@ set -euo pipefail
 ######################## INTERFACE
 DOCS_URI='https://github.com/nirv-ai/docs/blob/main/cfssl/README.md'
 NIRV_SCRIPT_DEBUG="${NIRV_SCRIPT_DEBUG:-0}"
-SCRIPTS_DIR_PARENT=$(dirname $SCRIPTS_DIR)
 SCRIPTS_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]%/}")" &>/dev/null && pwd)
+
+SCRIPTS_DIR_PARENT=$(dirname $SCRIPTS_DIR)
 
 # grouped by increasing order of dependency
 CA_CN="${CA_CN:-mesh.nirv.ai}"

@@ -2,55 +2,6 @@
 
 set -euo pipefail
 
-################
-## inspired by
-## TODO: must match the interface set by the other scripts
-## TODO: this file can use either the cli/http api
-### ^ every node requires the consul binary anyway, unlike vault
-## default files are owned by: systemd-network
-################ general flow:
-# TODO: move this into docs and fkn automate this shiz like script.vault.sh
-# ensure consul:consul is setup on host
-# ensure all application files & secrets on host are owned by consul:consul
-# in every image that runs consul (client|server)
-# force img consul:consul to match host consul:consul
-### create rootca & server certs
-# create tokens rootca, server client & cli certs using script.ssl.sh
-# `create gossipkey`
-# script.reset core_consul
-# `get info` >>> Error querying agent: Unexpected response code: 403 (Permission denied: token with AccessorID '00000000-0000-0000-0000-000000000002' lacks permission 'agent:read' on "consul")
-# `create consul-admin-token`
-# `. .env.cli`
-# `get info` >>> should not receive any errors
-# `get consul-admin-token` >>> validate UI login
-# should have access to almost everything
-### create policy files and tokens and push to consul server
-# see policy dir
-# `create policy`
-# `list policies`
-# `create acl-token` >>> put known services here for now
-# `create server-token svc-name` # for testing new services never use _ in service names, must match svc configs
-# `. .env.consul.server`
-# `list tokens`
-# `set agent-tokens` >>> from [WARN] agent: ...blocked by acls... --> to agent: synced node info
-### update docker images to include binary (see proxy for ubuntu, vault for alpine)
-### DISCOVERY: add configs for to each client machine
-# @see https://developer.hashicorp.com/consul/tutorials/get-started-vms/virtual-machine-gs-service-discovery
-# create a base discovery/client/config/* that can be used as defaults for each specific client service
-# create discovery/service-name/config/* configs
-# copy discovery/{client,service-name}/configs/* into each app/service-name/consul/src/config
-# validate each config has the data it needs
-# ^ `get service-acl-token core-proxy`
-# ^ `get team` >>> need the server ip for retry_join, for some reason setting hostname doesnt work
-# ^ reuse gossipkey, should be in jail/tls/gossipkey
-# ^^ TODO: gossipkey should be a symlink to /run/secrets
-# ^ (TODO: automate this)
-# sudo chown -R consul:consul app/svc-name/src/consul
-# ^ required due to secrets gid/uid bug, check CONSUL_{GID,UID} vars in compose .env
-# sudo rm -rf app/svc-name/src/consul/data/* if starting from scratch
-# script.reset|refresh compose_service_name(s) to boot consul clients
-### MESH: this is a migration from discovery to mesh
-
 ######################## INTERFACE
 DOCS_URI='https://github.com/nirv-ai/docs/blob/main/consul/README.md'
 SCRIPTS_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]%/}")" &>/dev/null && pwd)"
@@ -59,20 +10,24 @@ NIRV_SCRIPT_DEBUG="${NIRV_SCRIPT_DEBUG:-1}"
 
 # grouped by increasing order of dependency
 APP_PREFIX='nirvai'
+CONFIGS_DIR_NAME=configs
 CONSUL_INSTANCE_DIR_NAME='core-consul'
 CONSUL_SERVICE_NAME=core-consul
 DATACENTER=us-east
 JAIL="${SCRIPTS_DIR_PARENT}/secrets"
 MESH_HOSTNAME=mesh.nirv.ai
 REPO_DIR="${SCRIPTS_DIR_PARENT}/core"
+GOSSIP_KEY_NAME='config.consul.gossip.hcl'
 
 APPS_DIR="${REPO_DIR}/apps"
+
 JAIL_TLS="${JAIL}/${MESH_HOSTNAME}/tls"
-JAIL_TOKENS="${JAIL}/${MESH_HOSTNAME}/tokens"
+JAIL_TOKENS="${JAIL}/consul/tokens"
+JAIL_KEYS="${JAIL}/consul/keys"
 
 CONSUL_INSTANCE_SRC_DIR="${APPS_DIR}/${APP_PREFIX}-${CONSUL_INSTANCE_DIR_NAME}/src"
+JAIL_GOSSIP_KEY="${JAIL_KEYS}/${GOSSIP_KEY_NAME}"
 
-CONSUL_INSTANCE_DATA_DIR="${CONSUL_INSTANCE_SRC_DIR}/data"
 CONSUL_INSTANCE_CONFIG_DIR="${CONSUL_INSTANCE_SRC_DIR}/config"
 CONSUL_INSTANCE_POLICY_DIR="${CONSUL_INSTANCE_SRC_DIR}/policy"
 
@@ -80,18 +35,17 @@ CONSUL_INSTANCE_POLICY_DIR="${CONSUL_INSTANCE_SRC_DIR}/policy"
 
 declare -A EFFECTIVE_INTERFACE=(
   [CONSUL_INSTANCE_CONFIG_DIR]=$CONSUL_INSTANCE_CONFIG_DIR
-  [CONSUL_INSTANCE_DATA_DIR]=$CONSUL_INSTANCE_DATA_DIR
   [CONSUL_INSTANCE_POLICY_DIR]=$CONSUL_INSTANCE_POLICY_DIR
   [DATACENTER]=$DATACENTER
+  [JAIL_GOSSIP_KEY]=$JAIL_GOSSIP_KEY
   [JAIL_TLS]=$JAIL_TLS
   [JAIL_TOKENS]=$JAIL_TOKENS
 
-  [CLI_NAME]=$CLI_NAME
-  [CLIENT_NAME]=$CLIENT_NAME
-  [JAIL_TLS]=$JAIL_TLS
-  [SCRIPTS_DIR_PARENT]=$SCRIPTS_DIR_PARENT
-  [SCRIPTS_DIR]=$SCRIPTS_DIR
-  [SERVER_NAME]=$SERVER_NAME
+  # [CLIENT_NAME]=$CLIENT_NAME
+  # [JAIL_TLS]=$JAIL_TLS
+  # [SCRIPTS_DIR_PARENT]=$SCRIPTS_DIR_PARENT
+  # [SCRIPTS_DIR]=$SCRIPTS_DIR
+  # [SERVER_NAME]=$SERVER_NAME
 )
 
 ######################## UTILS
@@ -102,20 +56,28 @@ done
 ######################## CREDIT CHECK
 echo_debug_interface
 
-throw_missing_program cfssl 400 'sudo apt install golang-cfssl'
-throw_missing_program cfssljson 400 'sudo apt install golang-cfssl'
+throw_missing_program consul 400 '@see https://developer.hashicorp.com/consul/downloads'
 throw_missing_program jq 400 'sudo apt install jq'
 
-throw_missing_dir $CFSSL_DIR 400 'cant find certificate authority configuration files'
 throw_missing_dir $JAIL 400 "mkdir -p $JAIL"
+throw_missing_dir $JAIL_TLS 400 '@see https://github.com/nirv-ai/docs/tree/main/cfssl'
 
 ######################## FNS
+## reusable
 validate_consul() {
   file_or_dir=${1:-'file or directory required for validation'}
 
   consule validate $1
 }
 
+## actions
+create_gossip_key() {
+  echo_debug 'creating gossip key'
+  mkdir -p $JAIL_KEYS
+  echo "encrypt = \"$(consul keygen)\"" >$JAIL_GOSSIP_KEY
+}
+
+## todo
 # consul kv put consul/configuration/db_port 5432
 # consul kv get consul/configuration/db_port
 # dig @127.0.0.1 -p 8600 consul.service.consul
@@ -197,11 +159,7 @@ create)
   what=${2:-''}
 
   case $what in
-  gossipkey)
-    throw_missing_dir $JAIL 400 'local jail required'
-    mkdir -p $JAIL/tls
-    consul keygen >$JAIL/tls/gossipkey
-    ;;
+  gossipkey) create_gossip_key ;;
   consul-admin-token)
     mkdir -p $JAIL/tokens
     consul acl bootstrap --format json >$JAIL/tokens/admin-consul.token.json
