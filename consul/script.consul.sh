@@ -14,7 +14,7 @@ APP_PREFIX='nirvai'
 CONFIGS_DIR_NAME=configs
 CONSUL_INSTANCE_DIR_NAME='core-consul'
 CONSUL_SERVICE_NAME=core-consul
-DATACENTER=us-east
+DATA_CENTER=us-east
 GOSSIP_KEY_NAME='config.consul.gossip.hcl'
 JAIL="${SCRIPTS_DIR_PARENT}/secrets"
 MESH_HOSTNAME=mesh.nirv.ai
@@ -40,7 +40,7 @@ declare -A EFFECTIVE_INTERFACE=(
   [CONFIG_DIR_POLICY]=$CONFIG_DIR_POLICY
   [CONSUL_INSTANCE_CONFIG_DIR]=$CONSUL_INSTANCE_CONFIG_DIR
   [CONSUL_INSTANCE_POLICY_DIR]=$CONSUL_INSTANCE_POLICY_DIR
-  [DATACENTER]=$DATACENTER
+  [DATA_CENTER]=$DATA_CENTER
   [JAIL_DIR_TLS]=$JAIL_DIR_TLS
   [JAIL_DIR_TOKENS]=$JAIL_DIR_TOKENS
   [JAIL_KEY_GOSSIP]=$JAIL_KEY_GOSSIP
@@ -94,7 +94,7 @@ create_policy() {
 
   echo_debug "creating policy $policy"
 
-  # -datacenter $DATA_CENTER
+  # -DATA_CENTER $DATA_CENTER
   consul acl policy create \
     -name "$policy" \
     -description "$policy" \
@@ -116,11 +116,13 @@ create_policies() {
   done
 
 }
+# TODO: this should call create_token
 create_server_policy_tokens() {
   local server_policies=$(get_filenames_in_dir_no_ext $CONFIG_DIR_POLICY/server)
 
   echo_debug "creating tokens for policies: $server_policies"
 
+  mkdir -p $JAIL_DIR_TOKENS
   for policy in $server_policies; do
     consul acl token create \
       -policy-name="$policy" \
@@ -128,31 +130,26 @@ create_server_policy_tokens() {
       --format json >$JAIL_DIR_TOKENS/token.$policy.json
   done
 }
-create_service_tokens() {
+# TODO: this should call create_token
+create_service_policy_tokens() {
   local service_policies=$(get_filenames_in_dir_no_ext $CONFIG_DIR_POLICY/service)
 
   echo_debug "creating tokens for services: $service_policies"
 
-  # consul acl token create \
-  #   -node-identity="${svc_name}:us-east" \
-  #   -service-identity="${svc_name}" \
-  #   -policy-name="$policy_name" \
-  #   -description="acl token for ${svc_name}" \
-  #   --format json >${JAIL}/tokens/${svc_name}-acl.token.json 2>/dev/null
+  mkdir -p $JAIL_DIR_TOKENS
+  for policy in $service_policies; do
+    # type-policy-svc-name > svc-name
+    local svc_name=${policy#*-*-}
+    echo_debug "create token $policy for $svc_name:$DATA_CENTER"
 
-  # consul acl token create \
-  #   -node-identity="core-proxy:us-east" \
-  #   -service-identity="core-proxy" \
-  #   -policy-name="acl-policy-core-proxy" \
-  #   -description="acl token for core-proxy" \
-  #   --format json >${JAIL}/tokens/core-proxy-acl.token.json 2>/dev/null
-
-  # consul acl token create \
-  #   -node-identity="core-vault:us-east" \
-  #   -service-identity="core-vault" \
-  #   -policy-name="acl-policy-core-vault" \
-  #   -description="acl token for core-vault" \
-  #   --format json >${JAIL}/tokens/core-vault-acl.token.json 2>/dev/null
+    # TODO: might need to add $DATA_CENTER to filename
+    consul acl token create \
+      -node-identity="$svc_name:$DATA_CENTER" \
+      -service-identity="$svc_name" \
+      -policy-name="$policy" \
+      -description="$policy:$DATA_CENTER" \
+      --format json >${JAIL_DIR_TOKENS}/token.$svc_name.json 2>/dev/null
+  done
 }
 get_root_token() {
   throw_missing_file $JAIL_TOKEN_ROOT 400 'cant find root token'
@@ -242,7 +239,7 @@ create)
   root-token) create_root_token ;;
   policies) create_policies ;;
   server-policy-tokens) create_server_policy_tokens ;;
-  service-tokens) create_service_tokens ;;
+  service-policy-tokens) create_service_policy_tokens ;;
   *) invalid_request ;;
   esac
   ;;
