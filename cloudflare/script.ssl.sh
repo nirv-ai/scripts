@@ -121,7 +121,7 @@ create_server_cert() {
       -ca-key=$CA_PRIVKEY \
       -config=$CFFSL_CONFIG \
       $SERVER_CONFIG |
-      cfssljson -bare "${JAIL_DIR_TLS}/$SERVER_NAME-${i}"
+      cfssljson -bare "${JAIL_DIR_TLS}/$SERVER_NAME-${i}" || true # doesnt overwrite existing tokens
     i=$((i + 1))
   done
 
@@ -158,7 +158,7 @@ create_client_cert() {
       -ca-key=$CA_PRIVKEY \
       -config=$CFFSL_CONFIG \
       $CLIENT_CONFIG |
-      cfssljson -bare "${JAIL_DIR_TLS}/$CLIENT_NAME-${i}"
+      cfssljson -bare "${JAIL_DIR_TLS}/$CLIENT_NAME-${i}" || true # doesnt overwrite existing tokens
     i=$((i + 1))
   done
 
@@ -196,7 +196,7 @@ create_cli_cert() {
       -config=$CFFSL_CONFIG \
       -profile=client \
       $CLI_CONFIG |
-      cfssljson -bare "${JAIL_DIR_TLS}/$CLI_NAME-${i}"
+      cfssljson -bare "${JAIL_DIR_TLS}/$CLI_NAME-${i}" || true # doesnt overwrite existing tokens
     i=$((i + 1))
   done
 
