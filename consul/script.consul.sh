@@ -4,7 +4,7 @@ set -euo pipefail
 
 ######################## INTERFACE
 DOCS_URI='https://github.com/nirv-ai/docs/blob/main/consul/README.md'
-NIRV_SCRIPT_DEBUG="${NIRV_SCRIPT_DEBUG:-1}"
+NIRV_SCRIPT_DEBUG="${NIRV_SCRIPT_DEBUG:-0}"
 SCRIPTS_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]%/}")" &>/dev/null && pwd)"
 
 SCRIPTS_DIR_PARENT="$(dirname $SCRIPTS_DIR)"
@@ -19,8 +19,9 @@ GOSSIP_KEY_NAME='config.consul.gossip.hcl'
 JAIL="${SCRIPTS_DIR_PARENT}/secrets"
 MESH_HOSTNAME=mesh.nirv.ai
 REPO_DIR="${SCRIPTS_DIR_PARENT}/core"
-ROOT_TOKEN_NAME=token.root.json
-
+ROOT_TOKEN_NAME=root
+DNS_TOKEN_NAME=acl-policy-dns
+SERVER_TOKEN_NAME=acl-policy-consul
 APPS_DIR="${REPO_DIR}/apps"
 CONFIG_DIR_POLICY="${SCRIPTS_DIR_PARENT}/${CONFIGS_DIR_NAME}/consul/policy"
 JAIL_DIR_KEYS="${JAIL}/consul/keys"
@@ -29,8 +30,9 @@ JAIL_DIR_TOKENS="${JAIL}/consul/tokens"
 
 CONSUL_INSTANCE_SRC_DIR="${APPS_DIR}/${APP_PREFIX}-${CONSUL_INSTANCE_DIR_NAME}/src"
 JAIL_KEY_GOSSIP="${JAIL_DIR_KEYS}/${GOSSIP_KEY_NAME}"
-JAIL_TOKEN_ROOT="${JAIL_DIR_TOKENS}/${ROOT_TOKEN_NAME}"
-
+JAIL_TOKEN_ROOT="${JAIL_DIR_TOKENS}/token.${ROOT_TOKEN_NAME}.json"
+JAIL_TOKEN_POLICY_DNS="${JAIL_DIR_TOKENS}/token.${DNS_TOKEN_NAME}.json"
+JAIL_TOKEN_POLICY_SERVER="${JAIL_DIR_TOKENS}/token.${SERVER_TOKEN_NAME}.json"
 CONSUL_INSTANCE_CONFIG_DIR="${CONSUL_INSTANCE_SRC_DIR}/config"
 CONSUL_INSTANCE_POLICY_DIR="${CONSUL_INSTANCE_SRC_DIR}/policy"
 
@@ -45,6 +47,8 @@ declare -A EFFECTIVE_INTERFACE=(
   [JAIL_DIR_TOKENS]=$JAIL_DIR_TOKENS
   [JAIL_KEY_GOSSIP]=$JAIL_KEY_GOSSIP
   [JAIL_TOKEN_ROOT]=$JAIL_TOKEN_ROOT
+  [JAIL_TOKEN_POLICY_DNS]=$JAIL_TOKEN_POLICY_DNS
+  [JAIL_TOKEN_POLICY_SERVER]=$JAIL_TOKEN_POLICY_SERVER
 
   # [CLIENT_NAME]=$CLIENT_NAME
   # [JAIL_DIR_TLS]=$JAIL_DIR_TLS
@@ -151,26 +155,23 @@ create_service_policy_tokens() {
       --format json >${JAIL_DIR_TOKENS}/token.$svc_name.json 2>/dev/null
   done
 }
-get_root_token() {
-  throw_missing_file $JAIL_TOKEN_ROOT 400 'cant find root token'
-  echo $(cat $JAIL_TOKEN_ROOT | jq -r ".SecretID")
+get_token() {
+  throw_missing_file $1 400 'cant find token file'
+  echo $(cat $1 | jq -r ".SecretID")
 }
 
 set_server_tokens() {
-  if test -z ${CONSUL_DNS_TOKEN:-''}; then
-    echo 'CONSUL_DNS_TOKEN not found in env`'
-    exit 1
-  fi
+  echo -e "setting tokens: wait for validation"
+  # the below swallows the errors
+  dns_token=$(get_token $JAIL_TOKEN_POLICY_DNS)
+  server_token=$(get_token $JAIL_TOKEN_POLICY_SERVER)
 
-  if test -z ${CONSUL_SERVER_NODE_TOKEN:-''}; then
-    echo 'CONSUL_SERVER_NODE_TOKEN not found in env`'
-    exit 1
-  fi
+  # will log success if the above didnt exit
+  # but success doesnt mean the acls/tokens are configured properly
+  # just that they were set, lol
+  consul acl set-agent-token default "$dns_token"
+  consul acl set-agent-token agent "$server_token"
 
-  echo -e "TODO: setting static dns & server node tokens"
-
-  consul acl set-agent-token default ${CONSUL_DNS_TOKEN}
-  consul acl set-agent-token agent ${CONSUL_SERVER_NODE_TOKEN}
 }
 ## todo
 # consul kv put consul/configuration/db_port 5432
@@ -178,7 +179,7 @@ set_server_tokens() {
 # dig @127.0.0.1 -p 8600 consul.service.consul
 # consul catalog services -tags
 # consul services register svc-db.hcl
-
+# curl 172.17.0.1:8500/v1/status/leader  #get the leader
 # consul cmd cmd cmd --help has wonderful examples, thank me later
 cmd=${1:-''}
 
@@ -188,7 +189,7 @@ set)
   what=${2:?''}
 
   case $what in
-  agent-tokens) set_server_tokens ;;
+  server-tokens) set_server_tokens ;;
   *) invalid_request ;;
   esac
   ;;
@@ -205,28 +206,17 @@ get)
   what=${2:-''}
 
   case $what in
-  info)
-    consul info
-    ;;
-  team)
-    consul members
-    ;;
-  root-token) get_root_token ;;
-  dns-token)
-    server_dns_Token="${JAIL}/tokens/dns-acl.token.json"
-    throw_missing_file $server_dns_Token 400 'couldnt find dns token'
-    echo $(cat $server_dns_Token | jq -r ".SecretID")
-    ;;
-  server-acl-token)
-    server_node_token="${JAIL}/tokens/server-acl.token.json"
-    throw_missing_file $server_node_token 400 'cant find server token'
-    echo $(cat $server_node_token | jq -r ".SecretID")
-    ;;
-  service-acl-token)
+  info) consul info ;;
+  team) consul members ;;
+  nodes) consul catalog nodes -detailed ;;
+  policy) consul acl policy read -id ${3:?'policy id required: use `list policies`'} ;;
+  token-info) consul acl token read -id ${3:?'token axor id required: use `list tokens`'} ;;
+  root-token) get_token $JAIL_TOKEN_ROOT ;;
+  dns-token) get_token $JAIL_TOKEN_POLICY_DNS ;;
+  server-token) get_token $JAIL_TOKEN_POLICY_SERVER ;;
+  service-token)
     svc_name=${3:?'svc_name required'}
-    server_node_token="${JAIL}/tokens/${svc_name}-acl.token.json"
-    throw_missing_file $server_node_token 'cant find service token'
-    echo $(cat $server_node_token | jq -r ".SecretID")
+    get_token ${JAIL_DIR_TOKENS}/token.${svc_name}.json
     ;;
   *) invalid_request ;;
   esac
