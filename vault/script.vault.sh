@@ -113,8 +113,6 @@ get_filename_without_extension() {
   local full_path_with_ext=${1:?'cant get unknown path: string not provided'}
   local file_with_ext=$(get_file_name $full_path_with_ext)
 
-  # wont work if file.name.contains.periods
-  # will return the `file` in above example
   echo "${file_with_ext%.*}"
 }
 ####################### REQUESTS
