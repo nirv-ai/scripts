@@ -22,7 +22,9 @@ REPO_DIR="${SCRIPTS_DIR_PARENT}/core"
 ROOT_TOKEN_NAME=root
 DNS_TOKEN_NAME=acl-policy-dns
 SERVER_TOKEN_NAME=acl-policy-consul
+
 APPS_DIR="${REPO_DIR}/apps"
+CONFIG_DIR_INTENTION="${SCRIPTS_DIR_PARENT}/${CONFIGS_DIR_NAME}/consul/intention"
 CONFIG_DIR_POLICY="${SCRIPTS_DIR_PARENT}/${CONFIGS_DIR_NAME}/consul/policy"
 JAIL_DIR_KEYS="${JAIL}/consul/keys"
 JAIL_DIR_TLS="${JAIL}/${MESH_HOSTNAME}/tls"
@@ -39,6 +41,7 @@ CONSUL_INSTANCE_POLICY_DIR="${CONSUL_INSTANCE_SRC_DIR}/policy"
 # CONSUL_CONFIG_TARGET="${CONSUL_INSTANCE_CONFIG_DIR}/${CONSUL_CONFIG_TARGET:-''}"
 
 declare -A EFFECTIVE_INTERFACE=(
+  [CONFIG_DIR_INTENTION]=$CONFIG_DIR_INTENTION
   [CONFIG_DIR_POLICY]=$CONFIG_DIR_POLICY
   [CONSUL_INSTANCE_CONFIG_DIR]=$CONSUL_INSTANCE_CONFIG_DIR
   [CONSUL_INSTANCE_POLICY_DIR]=$CONSUL_INSTANCE_POLICY_DIR
@@ -46,9 +49,9 @@ declare -A EFFECTIVE_INTERFACE=(
   [JAIL_DIR_TLS]=$JAIL_DIR_TLS
   [JAIL_DIR_TOKENS]=$JAIL_DIR_TOKENS
   [JAIL_KEY_GOSSIP]=$JAIL_KEY_GOSSIP
-  [JAIL_TOKEN_ROOT]=$JAIL_TOKEN_ROOT
   [JAIL_TOKEN_POLICY_DNS]=$JAIL_TOKEN_POLICY_DNS
   [JAIL_TOKEN_POLICY_SERVER]=$JAIL_TOKEN_POLICY_SERVER
+  [JAIL_TOKEN_ROOT]=$JAIL_TOKEN_ROOT
 
   # [CLIENT_NAME]=$CLIENT_NAME
   # [JAIL_DIR_TLS]=$JAIL_DIR_TLS
@@ -118,7 +121,19 @@ create_policies() {
   for policy in $service_policies; do
     create_policy $policy $CONFIG_DIR_POLICY/service/$policy.hcl
   done
+}
+create_intention() {
+  intention_path=${1:?intention path required}
+  throw_missing_file $intention_path 400 'invalid path to intention'
 
+  consul config write $intention_path
+}
+create_intentions() {
+  for intention in $CONFIG_DIR_INTENTION/*; do
+    test -f $intention || break
+
+    create_intention $intention
+  done
 }
 # TODO: this should call create_token
 create_server_policy_tokens() {
@@ -228,6 +243,7 @@ create)
   gossipkey) create_gossip_key ;;
   root-token) create_root_token ;;
   policies) create_policies ;;
+  intentions) create_intentions ;;
   server-policy-tokens) create_server_policy_tokens ;;
   service-policy-tokens) create_service_policy_tokens ;;
   *) invalid_request ;;
