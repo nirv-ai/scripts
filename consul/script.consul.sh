@@ -84,16 +84,19 @@ throw_missing_dir $CONFIG_DIR_SERVICE 400 'create or copy from: https://github.c
 ######################## FNS
 ## reusable
 validate_consul() {
+  # this needs to work on the *full* set of conf files
+  # that will be used by an agent
   file_or_dir=${1:-'file or directory required for validation'}
 
   consul validate $1
 }
-validate_consul_known_dirs() {
-  local known_dirs=($CONFIG_DIR_GLOBAL $CONFIG_DIR_SERVER $CONFIG_DIR_CLIENT $CONFIG_DIR_SERVICE/*)
-  for dir in "${known_dirs[@]}"; do
-    echo_debug "validating dir: $dir"
-    validate_consul $dir
-  done
+validate_nomad_fmt() {
+  throw_missing_program nomad 400 "nomad required to format hcl files"
+
+  local conf_dir=${SCRIPTS_DIR_PARENT}/${CONFIGS_DIR_NAME}
+  echo_debug "formatting hcl in $conf_dir"
+
+  nomad fmt -list=true -check -write=true -recursive $conf_dir
 }
 ## actions
 create_gossip_key() {
@@ -215,9 +218,9 @@ cmd=${1:-''}
 case $cmd in
 reload) consul reload ;;
 validate)
-  what=${2:-'errrthang'}
+  what=${2:-'hcl'}
   case $what in
-  errrthang) validate_consul_known_dirs ;;
+  hcl) validate_nomad_fmt ;;
   *) validate_consul $what ;;
   esac
   ;;
