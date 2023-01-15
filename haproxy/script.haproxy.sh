@@ -5,7 +5,6 @@ set -eu
 ######################## INTERFACE
 DOCS_URI='https://github.com/nirv-ai/docs/tree/main/scripts'
 SCRIPTS_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]%/}")" &>/dev/null && pwd)"
-
 SCRIPTS_DIR_PARENT="$(dirname $SCRIPTS_DIR)"
 
 # grouped by increasing order of dependency
@@ -39,6 +38,10 @@ conf_info() {
 }
 
 conf_reload() {
+  echo "TODO: this just kills the container, instead use script.refresh.compose.sh $1"
+
+  exit 0
+
   is_valid=$(conf_validate "$1")
 
   cunt_id=$(get_cunt_id $1)
@@ -48,7 +51,7 @@ conf_reload() {
   fi
 
   case $is_valid in
-  "Configuration file is valid"*) docker kill -s HUP "$cunt_id" ;;
+  "Configuration file is valid"*) docker kill -s SIGUSR2 "$cunt_id" ;;
   *) echo_err "\nnot reloading:\n$is_valid\n" ;;
   esac
 }
