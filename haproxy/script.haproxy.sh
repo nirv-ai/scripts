@@ -38,6 +38,7 @@ conf_info() {
 }
 
 conf_reload() {
+  # @see https://github.com/haproxytech/haproxy/blob/master/blog/integration_with_consul/haproxy_reload.sh
   echo "TODO: this just kills the container, instead use script.refresh.compose.sh $1"
 
   exit 0

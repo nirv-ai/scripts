@@ -24,6 +24,7 @@ SERVER_TOKEN_NAME=acl-policy-consul
 
 APPS_DIR="${REPO_DIR}/apps"
 CONFIG_DIR_CLIENT="${SCRIPTS_DIR_PARENT}/${CONFIGS_DIR_NAME}/consul/client"
+CONFIG_DIR_DEFAULTS="${SCRIPTS_DIR_PARENT}/${CONFIGS_DIR_NAME}/consul/defaults"
 CONFIG_DIR_GLOBAL="${SCRIPTS_DIR_PARENT}/${CONFIGS_DIR_NAME}/consul/global"
 CONFIG_DIR_INTENTION="${SCRIPTS_DIR_PARENT}/${CONFIGS_DIR_NAME}/consul/intention"
 CONFIG_DIR_POLICY="${SCRIPTS_DIR_PARENT}/${CONFIGS_DIR_NAME}/consul/policy"
@@ -40,6 +41,7 @@ JAIL_TOKEN_ROOT="${JAIL_DIR_TOKENS}/token.${ROOT_TOKEN_NAME}.json"
 
 declare -A EFFECTIVE_INTERFACE=(
   [CONFIG_DIR_CLIENT]=$CONFIG_DIR_CLIENT
+  [CONFIG_DIR_DEFAULTS]=$CONFIG_DIR_DEFAULTS
   [CONFIG_DIR_GLOBAL]=$CONFIG_DIR_GLOBAL
   [CONFIG_DIR_INTENTION]=$CONFIG_DIR_INTENTION
   [CONFIG_DIR_POLICY]=$CONFIG_DIR_POLICY
@@ -135,17 +137,24 @@ create_policies() {
     create_policy $policy $CONFIG_DIR_POLICY/service/$policy.hcl
   done
 }
-create_intention() {
-  intention_path=${1:?intention path required}
-  throw_missing_file $intention_path 400 'invalid path to intention'
+create_config() {
+  config_path=${1:?config path required}
+  throw_missing_file $config_path 400 'invalid path to config file'
 
-  consul config write $intention_path
+  consul config write $config_path
 }
 create_intentions() {
-  for intention in $CONFIG_DIR_INTENTION/*; do
-    test -f $intention || break
+  for conf in $CONFIG_DIR_INTENTION/*; do
+    test -f $conf || break
 
-    create_intention $intention
+    create_config $conf
+  done
+}
+create_defaults() {
+  for conf in $CONFIG_DIR_DEFAULTS/*; do
+    test -f $conf || break
+
+    create_config $conf
   done
 }
 # TODO: this should call create_token
@@ -246,7 +255,8 @@ sync_local_configs() {
     done
 
     request_sudo "$(basename $svc_app) app: setting ownership to consul:consul"
-    sudo chown -R consul:consul $svc_app
+    sudo chown -R consul:consul $svc_app/config
+    sudo chown -R consul:consul $svc_app/envoy
     validate_consul $svc_app/config || true # dont fail if error
   done
 }
@@ -316,6 +326,7 @@ create)
   root-token) create_root_token ;;
   policies) create_policies ;;
   intentions) create_intentions ;;
+  defaults) create_defaults ;;
   server-policy-tokens) create_server_policy_tokens ;;
   service-policy-tokens) create_service_policy_tokens ;;
   *) invalid_request ;;
