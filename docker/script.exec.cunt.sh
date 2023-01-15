@@ -1,33 +1,25 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 
 set -eu
 
-# TODO: update docs about using the project + service name instead of hardcoding a container name
-NAME_PREFIX=${CUNT_NAME_PREFIX:-'nirvai_core-'}
+######################## INTERFACE
+DOCS_URI='https://github.com/nirv-ai/docs/tree/main/scripts'
+SCRIPTS_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]%/}")" &>/dev/null && pwd)"
 
-# gets the first container with the matching name
-get_cunt_name() {
-  # perhaps they passed the containers full name
-  local container_id=$(docker ps -aqf "name=^${1}$")
+SCRIPTS_DIR_PARENT="$(dirname $SCRIPTS_DIR)"
 
-  if test ${#container_id} -gt 6; then
-    echo $container_id
-  else # try with the prefix
-    container_name_with_prefix="${NAME_PREFIX}${1}"
-    container_id=$(docker ps -aqf "name=^${container_name_with_prefix}" | head -n 1)
-    if test ${#container_id} -gt 6; then
-      echo $container_id
-    fi
-  fi
+######################## UTILS
+for util in $SCRIPTS_DIR/utils/*.sh; do
+  source $util
+done
 
-  echo ""
-}
+######################## FNS
 
 exec_into_container() {
-  cunt_id=$(get_cunt_name $1)
+  cunt_id=$(get_cunt_id $1)
 
   if test -z "$cunt_id"; then
-    echo "\ncouldnt find container with name $1 or ${NAME_PREFIX}${1}"
+    echo_err "\ncouldnt find container with name $1 or ${CUNT_PREFIX}${1}"
     exit 1
   fi
 
@@ -39,10 +31,10 @@ exec_into_container() {
   fi
 
   local args="\n$1: $cunt_id\nargs: $exec_args"
-  echo "trying to exec with bash\n$args"
+  echo_debug "trying to exec with bash\n$args"
   if ! docker exec $exec_args "$cunt_id" bash; then
     echo
-    echo "trying to exec with sh\n$args"
+    echo_debug "trying to exec with sh\n$args"
     docker exec $exec_args "$cunt_id" sh
   fi
 }
