@@ -11,8 +11,8 @@ SCRIPTS_DIR_PARENT="$(dirname $SCRIPTS_DIR)"
 # grouped by increasing order of dependency
 APP_PREFIX='nirvai'
 CONFIGS_DIR_NAME=configs
-CONSUL_INSTANCE_DIR_NAME='core-consul'
-CONSUL_SERVICE_NAME=core-consul
+CONSUL_INSTANCES_SRC_PATH='src/consul' # will contain e.g. {config,envoy,data}
+CONSUL_SERVER_APP_NAME='core-consul'
 DATA_CENTER=us-east
 DNS_TOKEN_NAME=acl-policy-dns
 GOSSIP_KEY_NAME='config.global.gossip.hcl'
@@ -33,15 +33,10 @@ JAIL_DIR_KEYS="${JAIL}/consul/keys"
 JAIL_DIR_TLS="${JAIL}/${MESH_HOSTNAME}/tls"
 JAIL_DIR_TOKENS="${JAIL}/consul/tokens"
 
-CONSUL_INSTANCE_SRC_DIR="${APPS_DIR}/${APP_PREFIX}-${CONSUL_INSTANCE_DIR_NAME}/src"
 JAIL_KEY_GOSSIP="${JAIL_DIR_KEYS}/${GOSSIP_KEY_NAME}"
-JAIL_TOKEN_ROOT="${JAIL_DIR_TOKENS}/token.${ROOT_TOKEN_NAME}.json"
 JAIL_TOKEN_POLICY_DNS="${JAIL_DIR_TOKENS}/token.${DNS_TOKEN_NAME}.json"
 JAIL_TOKEN_POLICY_SERVER="${JAIL_DIR_TOKENS}/token.${SERVER_TOKEN_NAME}.json"
-
-CONSUL_INSTANCE_CONFIG_DIR="${CONSUL_INSTANCE_SRC_DIR}/config"
-
-# CONSUL_CONFIG_TARGET="${CONSUL_INSTANCE_CONFIG_DIR}/${CONSUL_CONFIG_TARGET:-''}"
+JAIL_TOKEN_ROOT="${JAIL_DIR_TOKENS}/token.${ROOT_TOKEN_NAME}.json"
 
 declare -A EFFECTIVE_INTERFACE=(
   [CONFIG_DIR_CLIENT]=$CONFIG_DIR_CLIENT
@@ -50,7 +45,7 @@ declare -A EFFECTIVE_INTERFACE=(
   [CONFIG_DIR_POLICY]=$CONFIG_DIR_POLICY
   [CONFIG_DIR_SERVER]=$CONFIG_DIR_SERVER
   [CONFIG_DIR_SERVICE]=$CONFIG_DIR_SERVICE
-  [CONSUL_INSTANCE_CONFIG_DIR]=$CONSUL_INSTANCE_CONFIG_DIR
+  [CONSUL_INSTANCES_SRC_PATH]=$CONSUL_INSTANCES_SRC_PATH
   [DATA_CENTER]=$DATA_CENTER
   [JAIL_DIR_TLS]=$JAIL_DIR_TLS
   [JAIL_DIR_TOKENS]=$JAIL_DIR_TOKENS
@@ -95,6 +90,11 @@ validate_nomad_fmt() {
   echo_debug "formatting hcl in $conf_dir"
 
   nomad fmt -list=true -check -write=true -recursive $conf_dir
+}
+get_app_dir() {
+  svc_name=${1:?service name is required}
+
+  echo "${APPS_DIR}/${APP_PREFIX}-$svc_name/${CONSUL_INSTANCES_SRC_PATH}"
 }
 ## actions
 create_gossip_key() {
@@ -187,7 +187,6 @@ get_token() {
   throw_missing_file $1 400 'cant find token file'
   echo $(cat $1 | jq -r ".SecretID")
 }
-
 set_server_tokens() {
   echo -e "setting tokens: wait for validation"
   # the below swallows the errors
@@ -199,6 +198,42 @@ set_server_tokens() {
   # just that they were set, lol
   consul acl set-agent-token default "$dns_token"
   consul acl set-agent-token agent "$server_token"
+
+}
+sync_local_configs() {
+  validate_nomad_fmt || true
+
+  echo_debug 'syncing local configs to app dirs'
+  local service_configs=(
+    $CONFIG_DIR_GLOBAL
+    $JAIL_KEY_GOSSIP
+    $CONFIG_DIR_CLIENT
+  )
+  local server_configs=(
+    $CONFIG_DIR_GLOBAL
+    $JAIL_KEY_GOSSIP
+    $CONFIG_DIR_SERVER
+  )
+  local services="$CONFIG_DIR_SERVICE"
+
+  echo_debug "service conf dir:\n${service_configs[@]}"
+  echo_debug "server conf dir:\n${server_configs[@]}"
+  echo_debug "services dir:\n${services}"
+
+  local consul_server_app="$(get_app_dir $CONSUL_SERVER_APP_NAME)/config"
+  echo_debug "syncing: $consul_server_app"
+  for conf in "${server_configs[@]}"; do
+    cp_to_dir $conf $consul_server_app
+  done
+  # update known services
+  for dir in $services/*; do
+    local svc_app=$(get_app_dir $(basename $dir))
+    echo_debug "syncing: $svc_app"
+    #   # cp -fLP -t $svc_app $dir/*
+  done
+
+  request_sudo 'destination dirs: setting ownership to consul:consul'
+  sudo chown -R consul:consul $consul_server_app
 
 }
 ## todo
@@ -214,6 +249,7 @@ set_server_tokens() {
 cmd=${1:-''}
 
 case $cmd in
+sync-confs) sync_local_configs ;;
 reload) consul reload ;;
 validate)
   what=${2:-'hcl'}
