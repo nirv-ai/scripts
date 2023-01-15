@@ -4,7 +4,6 @@ set -euo pipefail
 
 ######################## INTERFACE
 DOCS_URI='https://github.com/nirv-ai/docs/blob/main/consul/README.md'
-NIRV_SCRIPT_DEBUG="${NIRV_SCRIPT_DEBUG:-0}"
 SCRIPTS_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]%/}")" &>/dev/null && pwd)"
 
 SCRIPTS_DIR_PARENT="$(dirname $SCRIPTS_DIR)"
@@ -71,6 +70,7 @@ echo_debug_interface
 
 throw_missing_program consul 400 '@see https://developer.hashicorp.com/consul/downloads'
 throw_missing_program jq 400 'sudo apt install jq'
+throw_missing_program nomad 400 "@see https://developer.hashicorp.com/nomad/tutorials/get-started/get-started-install"
 
 throw_missing_dir $JAIL 400 "mkdir -p $JAIL"
 throw_missing_dir $JAIL_DIR_TLS 400 '@see https://github.com/nirv-ai/docs/tree/main/cfssl'
@@ -91,8 +91,6 @@ validate_consul() {
   consul validate $1
 }
 validate_nomad_fmt() {
-  throw_missing_program nomad 400 "nomad required to format hcl files"
-
   local conf_dir=${SCRIPTS_DIR_PARENT}/${CONFIGS_DIR_NAME}
   echo_debug "formatting hcl in $conf_dir"
 

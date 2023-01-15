@@ -2,6 +2,8 @@
 
 set -euo pipefail
 
+NIRV_SCRIPT_DEBUG="${NIRV_SCRIPT_DEBUG:-0}"
+
 echo_debug() {
   if [ "$NIRV_SCRIPT_DEBUG" = 1 ]; then
     echo -e "\n\n[DEBUG] $0\n------------------------\n"
