@@ -216,30 +216,40 @@ sync_local_configs() {
   )
   local services="$CONFIG_DIR_SERVICE"
 
-  echo_debug "client confs:\n${client_configs[@]}"
-  echo_debug "server confs:\n${server_configs[@]}"
-  echo_debug "services dir:\n${services}"
+  echo_debug "syncing server if found: $CONSUL_SERVER_APP_NAME"
+  if test -d "$CONSUL_SERVER_APP_NAME"; then
+    local server_app_config_dir="$(get_app_dir $CONSUL_SERVER_APP_NAME)/config"
 
-  local consul_server_app="$(get_app_dir $CONSUL_SERVER_APP_NAME)/config"
-  echo_debug "syncing: $consul_server_app"
-  for server_conf in "${server_configs[@]}"; do
-    cp_to_dir $server_conf $consul_server_app
-  done
-  request_sudo 'consul server app: setting ownership to consul:consul'
-  sudo chown -R consul:consul $consul_server_app
+    echo_debug "server confs:\n${server_configs[@]}"
+    echo_debug "syncing: $server_app_config_dir"
 
-  echo_debug 'syncing declared services'
+    for server_conf in "${server_configs[@]}"; do
+      cp_to_dir $server_conf $server_app_config_dir
+    done
+
+    request_sudo "setting ownership to consul:consul: $server_app_config_dir"
+    sudo chown -R consul:consul $server_app_config_dir
+    validate_consul $server_app_config_dir || true # dont fail if error
+  fi
+
+  echo_debug "syncing service(s) if any: $services"
+  echo_debug "with client confs:\n${client_configs[@]}"
   for srv_conf in $services/*; do
+    test -d $srv_conf || break
+
     local svc_app=$(get_app_dir $(basename $srv_conf))
-    echo_debug "syncing: $svc_app"
+    echo_debug "service found: $svc_app"
 
     cp_to_dir $srv_conf/config "$svc_app/config"
-    cp_to_dir $srv_conf/envoy "$svc_app" 'copy entire envoy directory'
+    cp_to_dir $srv_conf/envoy "$svc_app" 'replace entire envoy directory'
+
     for client_conf in "${client_configs[@]}"; do
       cp_to_dir $client_conf "$svc_app/config"
     done
+
     request_sudo "$(basename $svc_app) app: setting ownership to consul:consul"
     sudo chown -R consul:consul $svc_app
+    validate_consul $svc_app/config # dont fail if error
   done
 }
 ## todo

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # CUNT_PREFIX: should generally be ${COMPOSE_PROJECT_NAME}-
-# then the container name will be $CUNT_PREFIX-service-name-indexNumber
+# then the container name will be $CUNT_PREFIX-serviceName-indexNumber
 CUNT_PREFIX=${CUNT_PREFIX:-'nirvai-'}
 
 # gets the first container with the matching name
