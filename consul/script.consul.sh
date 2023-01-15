@@ -85,7 +85,7 @@ validate_consul() {
 
   consul validate $1
 }
-validate_nomad_fmt() {
+use_nomad_fmt() {
   local conf_dir=${SCRIPTS_DIR_PARENT}/${CONFIGS_DIR_NAME}
   echo_debug "formatting hcl in $conf_dir"
 
@@ -201,9 +201,8 @@ set_server_tokens() {
 
 }
 sync_local_configs() {
-  validate_nomad_fmt || true
+  use_nomad_fmt || true
 
-  echo_debug 'syncing local configs to app dirs'
   local client_configs=(
     $CONFIG_DIR_CLIENT
     $CONFIG_DIR_GLOBAL
@@ -232,8 +231,7 @@ sync_local_configs() {
     validate_consul $server_app_config_dir || true # dont fail if error
   fi
 
-  echo_debug "syncing service(s) if any: $services"
-  echo_debug "with client confs:\n${client_configs[@]}"
+  echo_debug "syncing service(s) if any:\n$services\nclient confs:\n${client_configs[@]}"
   for srv_conf in $services/*; do
     test -d $srv_conf || break
 
@@ -249,7 +247,7 @@ sync_local_configs() {
 
     request_sudo "$(basename $svc_app) app: setting ownership to consul:consul"
     sudo chown -R consul:consul $svc_app
-    validate_consul $svc_app/config # dont fail if error
+    validate_consul $svc_app/config || true # dont fail if error
   done
 }
 ## todo
@@ -270,7 +268,7 @@ reload) consul reload ;;
 validate)
   what=${2:-'hcl'}
   case $what in
-  hcl) validate_nomad_fmt ;;
+  hcl) use_nomad_fmt ;;
   *) validate_consul $what ;;
   esac
   ;;
