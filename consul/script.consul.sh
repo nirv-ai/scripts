@@ -232,8 +232,9 @@ sync_local_configs() {
   for srv_conf in $services/*; do
     local svc_app=$(get_app_dir $(basename $srv_conf))
     echo_debug "syncing: $svc_app"
-    echo "wtf is src_conf: $srv_conf"
-    # cp_to_dir $srv_conf "$svc_app/config"
+
+    cp_to_dir $srv_conf/config "$svc_app/config"
+    cp_to_dir $srv_conf/envoy "$svc_app" 'copy entire envoy directory'
     for client_conf in "${client_configs[@]}"; do
       cp_to_dir $client_conf "$svc_app/config"
     done
