@@ -5,6 +5,7 @@
 CUNT_PREFIX=${CUNT_PREFIX:-'nirvai-'}
 
 # gets the first container with the matching name
+# TODO: as a last resort, do a *$1* grep to get any matching container
 get_cunt_id() {
   # perhaps they passed the containers full name
   local container_id=$(docker ps -aqf "name=^${1}$")
