@@ -1,8 +1,7 @@
-#!/usr/bin/env bash
+#!/bin/false
 
-set -euo pipefail
-
-NIRV_SCRIPT_DEBUG="${NIRV_SCRIPT_DEBUG:-0}"
+## by using this file
+## you help to enforce a common debug interface
 
 echo_debug() {
   if [ "$NIRV_SCRIPT_DEBUG" = 1 ]; then
