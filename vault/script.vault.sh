@@ -8,7 +8,7 @@ SCRIPTS_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]%/}")" &>/dev/null && pwd)"
 
 SCRIPTS_DIR_PARENT="$(dirname $SCRIPTS_DIR)"
 
-# UTILS
+# PLATFORM UTILS
 for util in $SCRIPTS_DIR/utils/*.sh; do
   source $util
 done
@@ -67,8 +67,10 @@ throw_missing_program curl 400 '@see https://curl.se/download.html'
 throw_missing_program jq 400 '@see https://stedolan.github.io/jq/'
 
 ######################## FNS
-source $SCRIPTS_DIR/vault/script.vault.fns.sh
-source $SCRIPTS_DIR/vault/script.vault.pipelines.sh
+# VAULT UTILS
+for util in $SCRIPTS_DIR/vault/utils/*.sh; do
+  source $util
+done
 
 ######################## EXECUTE
 cmd=${1:-''}
