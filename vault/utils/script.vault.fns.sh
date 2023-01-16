@@ -1,6 +1,5 @@
 #!/bin/false
 
-# TODO: this shouldnt be needed any more
 get_payload_path() {
   local path=${1:?'cant get unknown path: string not provided'}
 
