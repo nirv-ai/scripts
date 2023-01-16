@@ -15,14 +15,13 @@ done
 
 ######################## INTERFACE
 # group by increasing order of dependency
-
-JAIL_VAULT_ADMIN="${JAIL_VAULT_PGP_DIR:-${JAIL}/tokens/admin}"
-JAIL_VAULT_OTHER="${OTHER_TOKEN_DIR:-${JAIL}/tokens/other}"
-JAIL_VAULT_ROOT="${JAIL_VAULT_ROOT:-${JAIL}/tokens/root}"
-TOKEN="${VAULT_TOKEN:?VAULT_TOKEN not set: exiting}"
+JAIL_VAULT_ADMIN="${JAIL_VAULT_PGP_DIR:-${JAIL}/vault/tokens/admin}"
+JAIL_VAULT_OTHER="${OTHER_TOKEN_DIR:-${JAIL}/vault/tokens/other}"
+JAIL_VAULT_ROOT="${JAIL_VAULT_ROOT:-${JAIL}/vault/tokens/root}"
 VAULT_API="${VAULT_ADDR:?VAULT_ADDR not set: exiting}/v1"
 VAULT_APP_SRC_PATH='src/vault'
 VAULT_SERVER_APP_NAME='core-vault'
+VAULT_TOKEN="${VAULT_TOKEN:?VAULT_TOKEN not set: exiting}"
 
 JAIL_VAULT_ROOT_PGP_KEY="${JAIL_VAULT_ROOT}/root.asc"
 JAIL_VAULT_UNSEAL_TOKENS="${JAIL_VAULT_ROOT}/unseal_tokens.json"
@@ -57,15 +56,15 @@ declare -A EFFECTIVE_INTERFACE=(
 ######################## CREDIT CHECK
 echo_debug_interface
 
-throw_missing_dir $JAIL_VAULT_ADMIN 400 'vault admin dir not found'
-throw_missing_dir $JAIL_VAULT_OTHER 400 'vault other token dir not found'
-throw_missing_dir $JAIL_VAULT_ROOT 400 'vault root admin dir not found'
 throw_missing_dir $SCRIPT_DIR_PARENT 500 "somethings wrong: cant find myself in filesystem"
-400 'app files are put here'
 
 throw_missing_program curl 400 '@see https://curl.se/download.html'
 throw_missing_program jq 400 '@see https://stedolan.github.io/jq/'
 
+# create secret dirs
+mkdir -p $JAIL_VAULT_ADMIN
+mkdir -p $JAIL_VAULT_OTHER
+mkdir -p $JAIL_VAULT_ROOT
 ######################## FNS
 # VAULT UTILS
 for util in $SCRIPTS_DIR/vault/utils/*.sh; do
