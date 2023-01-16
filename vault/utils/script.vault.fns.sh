@@ -1,12 +1,11 @@
 #!/bin/false
 
-# TODO: this shouldnt be needed any more
 get_payload_path() {
   local path=${1:?'cant get unknown path: string not provided'}
 
   case $path in
   "/"*) echo $path ;;
-  *) echo "$(pwd)/$path" ;;
+  *) echo "$(pwd)/$path" ;; # this should point to the APP_CONF_DIR or something
   esac
 }
 get_single_unseal_token() {
@@ -17,8 +16,8 @@ get_single_unseal_token() {
       gpg -dq
   )
 }
-get_JAIL_VAULT_UNSEAL_TOKENS() {
-  throw_missing_file $JAIL_VAULT_UNSEAL_TOKENS 400 'unseal_tokens not found'
+get_unseal_tokens() {
+  throw_missing_file $JAIL_VAULT_UNSEAL_TOKENS 400 'unseal_token(s) not found'
 
   echo -e "VAULT_TOKEN:\n\n$VAULT_TOKEN\n"
   echo -e "UNSEAL_TOKEN(s):\n"
