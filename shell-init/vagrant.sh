@@ -1,4 +1,4 @@
-#!/bin/env bash
+#!/usr/bin/env bash
 
 # vagrant, overriding vgt i'll never use it
 

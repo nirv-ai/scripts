@@ -20,7 +20,7 @@ JAIL_VAULT_ADMIN="${JAIL_VAULT_PGP_DIR:-${JAIL}/tokens/admin}"
 JAIL_VAULT_OTHER="${OTHER_TOKEN_DIR:-${JAIL}/tokens/other}"
 JAIL_VAULT_ROOT="${JAIL_VAULT_ROOT:-${JAIL}/tokens/root}"
 TOKEN="${VAULT_TOKEN:?VAULT_TOKEN not set: exiting}"
-VAULT_ADDR="${VAULT_ADDR:?VAULT_ADDR not set: exiting}/v1"
+VAULT_API="${VAULT_ADDR:?VAULT_ADDR not set: exiting}/v1"
 VAULT_APP_SRC_PATH='src/vault'
 VAULT_SERVER_APP_NAME='core-vault'
 
@@ -49,7 +49,7 @@ declare -A EFFECTIVE_INTERFACE=(
   [SCRIPTS_DIR_PARENT]=$SCRIPTS_DIR_PARENT
   [SECRET_KV1]=$SECRET_KV1
   [SECRET_KV2]=$SECRET_KV2
-  [VAULT_ADDR]=$VAULT_ADDR
+  [VAULT_API]=$VAULT_API
   [VAULT_APP_CONFIG_DIR]=$VAULT_APP_CONFIG_DIR
   [VAULT_APP_TARGET]=$VAULT_APP_TARGET
 )
@@ -72,6 +72,7 @@ for util in $SCRIPTS_DIR/vault/utils/*.sh; do
   source $util
 done
 
+exit 1
 ######################## EXECUTE
 cmd=${1:-''}
 case $cmd in
@@ -98,24 +99,24 @@ list)
   # @see https://github.com/hashicorp/vault/issues/1115 list only root tokens
   axors)
     echo_debug 'listing all tokens'
-    vault_list $VAULT_ADDR/$AUTH_TOKEN_ACCESSORS
+    vault_list $VAULT_API/$AUTH_TOKEN_ACCESSORS
     ;;
   secret-keys)
     syntax='syntax: list secret-keys kv[1|2] secretPath'
     secret_path=${4:-''}
     case $3 in
-    kv1) vault_list "$VAULT_ADDR/$SECRET_KV1/$secret_path" ;;
-    kv2) vault_list "$VAULT_ADDR/$SECRET_KV2_KEYS/$secret_path" ;;
+    kv1) vault_list "$VAULT_API/$SECRET_KV1/$secret_path" ;;
+    kv2) vault_list "$VAULT_API/$SECRET_KV2_KEYS/$secret_path" ;;
     esac
     ;;
   secret-engines)
-    vault_curl_auth "$VAULT_ADDR/$SYS_MOUNTS"
+    vault_curl_auth "$VAULT_API/$SYS_MOUNTS"
     ;;
   approles)
-    vault_list "$VAULT_ADDR/$AUTH_APPROLE_ROLE"
+    vault_list "$VAULT_API/$AUTH_APPROLE_ROLE"
     ;;
   approle-axors)
-    vault_list "$VAULT_ADDR/$AUTH_APPROLE_ROLE/${3:?'syntax: list approleName'}/secret-id"
+    vault_list "$VAULT_API/$AUTH_APPROLE_ROLE/${3:?'syntax: list approleName'}/secret-id"
     ;;
   postgres)
     case $3 in
@@ -123,7 +124,7 @@ list)
       # eg list postgres leases bff
       echo_debug "listing provisioned leases for postgres role $4"
 
-      vault_list "$VAULT_ADDR/$SYS_LEASES_LOOKUP_DB_CREDS/$4"
+      vault_list "$VAULT_API/$SYS_LEASES_LOOKUP_DB_CREDS/$4"
       ;;
     *) invalid_request ;;
     esac
@@ -146,7 +147,7 @@ patch)
       payload_data=$(data_data_only $payload_path)
 
       echo_debug "patching secret at $secret_path with $payload_data"
-      vault_patch_data "${payload_data}" "$VAULT_ADDR/$SECRET_KV2_DATA/$secret_path"
+      vault_patch_data "${payload_data}" "$VAULT_API/$SECRET_KV2_DATA/$secret_path"
       ;;
     esac
     ;;
@@ -167,7 +168,7 @@ create)
       payload_data=$(data_data_only $payload_path)
       echo_debug "creating secret at $secret_path with $payload_data"
 
-      vault_post_data "${payload_data}" "$VAULT_ADDR/$SECRET_KV2_DATA/$secret_path"
+      vault_post_data "${payload_data}" "$VAULT_API/$SECRET_KV2_DATA/$secret_path"
       ;;
     kv1)
       syntax='syntax: create secret kv1 secretPath pathToJson'
@@ -179,7 +180,7 @@ create)
 
       echo_debug "creating secret at $secret_path with $payload_path"
 
-      vault_post_data "@${payload_path}" "$VAULT_ADDR/$SECRET_KV1/$secret_path"
+      vault_post_data "@${payload_path}" "$VAULT_API/$SECRET_KV1/$secret_path"
       ;;
     *) invalid_request ;;
     esac
@@ -188,7 +189,7 @@ create)
     # eg: create approle-secret bff
     echo_debug "creating secret-id for approle $3"
 
-    vault_post_no_data "$VAULT_ADDR/$AUTH_APPROLE_ROLE/$3/secret-id" -X POST
+    vault_post_no_data "$VAULT_API/$AUTH_APPROLE_ROLE/$3/secret-id" -X POST
     ;;
   approle)
     # eg: create approle [/]path/to/distinct_role_name.json
@@ -205,14 +206,14 @@ create)
       rolename="${4:?'syntax: create token for-role roleName'}"
 
       echo_debug "creating token for role: $rolename"
-      vault_post_no_data $VAULT_ADDR/$TOKEN_CREATE_CHILD/$rolename
+      vault_post_no_data $VAULT_API/$TOKEN_CREATE_CHILD/$rolename
       ;;
     child)
       payload="${4:?$syntax}"
       payload_path=$(get_payload_path $payload)
 
       echo_debug "creating child token with payload:$payload_path"
-      vault_post_data "@${payload_path}" $VAULT_ADDR/$TOKEN_CREATE_CHILD
+      vault_post_data "@${payload_path}" $VAULT_API/$TOKEN_CREATE_CHILD
       ;;
     orphan) echo_debug "TODO: creating orphan tokens not setup for payload" ;;
     *) echo_debug $syntax ;;
@@ -235,7 +236,7 @@ get)
     case $getwhat in
     self)
       echo_debug 'running credit check...'
-      vault_curl_auth $VAULT_ADDR/$TOKEN_INFO_SELF
+      vault_curl_auth $VAULT_API/$TOKEN_INFO_SELF
       ;;
     info)
       if test -v $id; then
@@ -245,7 +246,7 @@ get)
 
       data=$(data_token_only $id)
       echo_debug "getting info for token: $data"
-      vault_post_data $data $VAULT_ADDR/$TOKEN_INFO
+      vault_post_data $data $VAULT_API/$TOKEN_INFO
       ;;
     axor)
       if test -v $id; then
@@ -255,7 +256,7 @@ get)
 
       data=$(data_axor_only $id)
       echo_debug "getting info for token via accessor id: $data"
-      vault_post_data $data $VAULT_ADDR/$TOKEN_INFO_ACCESSOR
+      vault_post_data $data $VAULT_API/$TOKEN_INFO_ACCESSOR
       ;;
     *) echo_debug $getwhat ;;
     esac
@@ -264,33 +265,33 @@ get)
     case $3 in
     creds)
       echo_debug "getting postgres creds for dbRole $4"
-      vault_curl_auth "$VAULT_ADDR/$DB_CREDS/$4"
+      vault_curl_auth "$VAULT_API/$DB_CREDS/$4"
       ;;
     *) invalid_request ;;
     esac
     ;;
-  secret-kv2-config) vault_curl_auth "$VAULT_ADDR/$SECRET_KV2_CONFIG" ;;
+  secret-kv2-config) vault_curl_auth "$VAULT_API/$SECRET_KV2_CONFIG" ;;
   secret)
     secret_path=${4:?'syntax: get secret kv[1|2] secretPath'}
     case $3 in
     kv2)
       version=${5:-''}
-      vault_curl_auth "$VAULT_ADDR/$SECRET_KV2_DATA/$secret_path?version=$version"
+      vault_curl_auth "$VAULT_API/$SECRET_KV2_DATA/$secret_path?version=$version"
       ;;
-    kv1) vault_curl_auth "$VAULT_ADDR/$SECRET_KV1/$secret_path" ;;
+    kv1) vault_curl_auth "$VAULT_API/$SECRET_KV1/$secret_path" ;;
     *) invalid_request ;;
     esac
     ;;
   status)
     # eg get status
-    curl_it "$VAULT_ADDR/$SYS_HEALTH"
+    curl_it "$VAULT_API/$SYS_HEALTH"
     ;;
   approle-creds)
     # eg get creds roleId secretId
     data=$(data_login $3 $4)
     echo_debug "getting creds for $3 with $data"
 
-    vault_post_data_no_auth $data "$VAULT_ADDR/$AUTH_APPROLE/login"
+    vault_post_data_no_auth $data "$VAULT_API/$AUTH_APPROLE/login"
     ;;
   approle)
     case $3 in
@@ -298,13 +299,13 @@ get)
       # eg get approle info bff
       echo_debug "getting info for approle $4"
 
-      vault_curl_auth "$VAULT_ADDR/$AUTH_APPROLE_ROLE/$4"
+      vault_curl_auth "$VAULT_API/$AUTH_APPROLE_ROLE/$4"
       ;;
     id)
       # eg: get approle id bff
       echo_debug "getting id for approle $4"
 
-      vault_curl_auth "$VAULT_ADDR/$AUTH_APPROLE_ROLE/$4/role-id"
+      vault_curl_auth "$VAULT_API/$AUTH_APPROLE_ROLE/$4/role-id"
       ;;
     secret-id)
       echo_debug "looking up secret-id for approle $4"
@@ -313,7 +314,7 @@ get)
       secretid=${5:?$syntax}
       data=$(data_secret_id_only $secretid)
 
-      vault_post_data "${data}" "$VAULT_ADDR/$AUTH_APPROLE_ROLE/$rolename/secret-id/lookup"
+      vault_post_data "${data}" "$VAULT_API/$AUTH_APPROLE_ROLE/$rolename/secret-id/lookup"
       ;;
     secret-id-axor)
       echo_debug "looking up secret-id accesor for approle $4"
@@ -322,7 +323,7 @@ get)
       secretid=${5:?$syntax}
       data=$(data_secret_id_axor_only $secretid)
 
-      vault_post_data "${data}" "$VAULT_ADDR/$AUTH_APPROLE_ROLE/$rolename/secret-id-accessor/lookup"
+      vault_post_data "${data}" "$VAULT_API/$AUTH_APPROLE_ROLE/$rolename/secret-id-accessor/lookup"
       ;;
     *) invalid_request ;;
     esac
@@ -331,7 +332,7 @@ get)
   esac
   ;;
 help)
-  vault_curl_auth "$VAULT_ADDR/$2?help=1"
+  vault_curl_auth "$VAULT_API/$2?help=1"
   ;;
 renew)
   who=${2:-''}
@@ -365,7 +366,7 @@ revoke)
 
     data=$(data_token_only $id)
     echo_debug "revoking token: $data"
-    vault_post_data $data $VAULT_ADDR/$TOKEN_REVOKE_ID
+    vault_post_data $data $VAULT_API/$TOKEN_REVOKE_ID
     ;;
   axor)
     if test -v $id; then
@@ -375,7 +376,7 @@ revoke)
 
     data=$(data_axor_only $id)
     echo_debug "revoking token via accessor: $data"
-    vault_post_data $data $VAULT_ADDR/$TOKEN_REVOKE_AXOR
+    vault_post_data $data $VAULT_API/$TOKEN_REVOKE_AXOR
     ;;
   parent)
     if test -v $id; then
@@ -385,11 +386,11 @@ revoke)
 
     data=$(data_token_only $id)
     echo_debug "revoking parent & parent secrets, orphaning children: $data"
-    vault_post_data $data $VAULT_ADDR/$TOKEN_REVOKE_PARENT
+    vault_post_data $data $VAULT_API/$TOKEN_REVOKE_PARENT
     ;;
   self)
     echo_debug "good bye!"
-    vault_post_no_data $VAULT_ADDR/$TOKEN_REVOKE_SELF
+    vault_post_no_data $VAULT_API/$TOKEN_REVOKE_SELF
     ;;
   approle-secret-id)
     echo_debug "revoking secret-id for approle $4"
@@ -398,7 +399,7 @@ revoke)
     secretid=${4:?$syntax}
     data=$(data_secret_id_only $secretid)
 
-    vault_post_data "${data}" "$VAULT_ADDR/$AUTH_APPROLE_ROLE/$rolename/secret-id/destroy"
+    vault_post_data "${data}" "$VAULT_API/$AUTH_APPROLE_ROLE/$rolename/secret-id/destroy"
     ;;
   approle-secret-id-axor)
     echo_debug "revoking secret-id accessor for approle $4"
@@ -407,7 +408,7 @@ revoke)
     secretidAxor=${4:?$syntax}
     data=$(data_secret_id_axor_only $secretidAxor)
 
-    vault_post_data "${data}" "$VAULT_ADDR/$AUTH_APPROLE_ROLE/$rolename/secret-id-accessor/destroy"
+    vault_post_data "${data}" "$VAULT_API/$AUTH_APPROLE_ROLE/$rolename/secret-id-accessor/destroy"
     ;;
   *) invalid_request ;;
   esac
@@ -420,8 +421,8 @@ rm)
   secret)
     secret_path=${4:?'syntax: get secret kv[1|2] secretPath'}
     case $3 in
-    kv2) vault_curl_auth "$VAULT_ADDR/$SECRET_KV2/$secret_path" -X DELETE ;;
-    kv1) vault_curl_auth "$VAULT_ADDR/$SECRET_KV1/$secret_path" -X DELETE ;;
+    kv2) vault_curl_auth "$VAULT_API/$SECRET_KV2/$secret_path" -X DELETE ;;
+    kv1) vault_curl_auth "$VAULT_API/$SECRET_KV1/$secret_path" -X DELETE ;;
     *) invalid_request ;;
     esac
     ;;
@@ -429,7 +430,7 @@ rm)
     # -X DELETE? $AUTH/token/roles/$id
     echo_debug 'delete token role not setup'
     ;;
-  approle-role) vault_delete "$VAULT_ADDR/$AUTH_APPROLE_ROLE/${id:?'syntax: rm approle roleName'}" ;;
+  approle-role) vault_delete "$VAULT_API/$AUTH_APPROLE_ROLE/${id:?'syntax: rm approle roleName'}" ;;
   esac
   ;;
 process)
