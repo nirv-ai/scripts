@@ -1,4 +1,4 @@
-#!/bin/false
+#!/usr/bin/env bash
 
 # @see https://www.digitalocean.com/community/tutorials/how-to-remove-docker-images-containers-and-volumes
 # @see https://docs.docker.com/config/formatting/

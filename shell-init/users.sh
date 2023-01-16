@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env bash
 
 # @see https://www.cyberciti.biz/faq/linux-change-user-group-uid-gid-for-all-owned-files/
 # @see https://www.cyberciti.biz/faq/how-do-i-find-all-the-files-owned-by-a-particular-user-or-group/?utm_source=Related_Tutorials&utm_medium=faq&utm_campaign=Apr_22_2022_EOP_TEXT

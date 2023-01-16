@@ -1,4 +1,4 @@
-#!/bin/false
+#!/usr/bin/env bash
 
 # ^ enable command completion
 [ -f /usr/local/bin/aws_completer ] && complete -C '/usr/local/bin/aws_completer' aws
@@ -24,7 +24,7 @@ aws_pg_versions() {
 aws_config_edit() {
   sudo nano ~/.aws/config
 }
-aws_ocreds_edit() {
+aws_creds_edit() {
   sudo nano ~/.aws/credentials
 }
 
