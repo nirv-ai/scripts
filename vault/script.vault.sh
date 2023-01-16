@@ -72,6 +72,7 @@ for util in $SCRIPTS_DIR/vault/utils/*.sh; do
   source $util
 done
 
+exit 1
 ######################## EXECUTE
 cmd=${1:-''}
 case $cmd in

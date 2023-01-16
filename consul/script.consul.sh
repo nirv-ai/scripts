@@ -195,7 +195,7 @@ set_server_tokens() {
 
 }
 sync_local_configs() {
-  use_nomad_fmt || true
+  use_hashi_fmt || true
 
   local client_configs=(
     $CONSUL_CONF_CLIENT
@@ -264,7 +264,7 @@ reload) consul reload ;;
 validate)
   what=${2:-'hcl'}
   case $what in
-  hcl) use_nomad_fmt ;;
+  hcl) use_hashi_fmt ;;
   *) validate_consul $what ;;
   esac
   ;;
