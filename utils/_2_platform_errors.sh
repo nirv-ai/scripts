@@ -1,9 +1,18 @@
-#!/usr/bin/env bash
+#!/bin/false
 
-set -euo pipefail
+## by using this file
+## you help to enforce a common error interface
+trap 'catch_then_exit $? $LINENO' EXIT ERR
 
 echo_err() {
   echo -e "$@" 1>&2
+}
+catch_then_exit() {
+  if [ "$1" != "0" ]; then
+    NIRV_SCRIPT_DEBUG=1
+    echo_debug_interface
+    echo_err "[EXIT CODE]: $1"
+  fi
 }
 throw_missing_file() {
   filepath=${1:?'file path is required'}
@@ -24,6 +33,7 @@ throw_missing_dir() {
   dirpath=${1:?'dir path is required'}
   code=${2:?'error code is required'}
   help=${3:?'help text is required'}
+
   if test ! -d "$dirpath"; then
     echo_err "\n[ERROR] directory is required"
     echo_err "------------------------\n"

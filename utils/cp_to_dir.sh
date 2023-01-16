@@ -1,6 +1,4 @@
-#!/usr/bin/env bash
-
-set -euo pipefail
+#!/bin/false
 
 # src === dir: src/* to dest/*
 # src === file: file to dest/file

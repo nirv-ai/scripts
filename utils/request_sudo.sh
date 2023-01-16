@@ -1,6 +1,4 @@
-#!/usr/bin/env bash
-
-set -euo pipefail
+#!/bin/false
 
 request_sudo() {
   NEEDED_FOR=${1:?'sudo requires a reason'}
