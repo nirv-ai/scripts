@@ -6,7 +6,7 @@ set -euo pipefail
 # append `--output-policy` to see the policy needed to execute a cmd
 
 # headers
-TOKEN_HEADER="X-Vault-Token: $TOKEN"
+TOKEN_HEADER="X-Vault-Token: $VAULT_TOKEN"
 
 # endpoints
 AUTH_APPROLE_ROLE=$AUTH_APPROLE/role
