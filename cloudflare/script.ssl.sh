@@ -7,27 +7,27 @@
 
 set -euo pipefail
 
-######################## INTERFACE
+######################## SETUP
 DOCS_URI='https://github.com/nirv-ai/docs/blob/main/cfssl/README.md'
-SCRIPTS_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]%/}")" &>/dev/null && pwd)
+SCRIPTS_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]%/}")" &>/dev/null && pwd)"
 
-SCRIPTS_DIR_PARENT=$(dirname $SCRIPTS_DIR)
+SCRIPTS_DIR_PARENT="$(dirname $SCRIPTS_DIR)"
 
+# UTILS
+for util in $SCRIPTS_DIR/utils/*.sh; do
+  source $util
+done
+
+######################## INTERFACE
 # grouped by increasing order of dependency
 CA_CN="${CA_CN:-mesh.nirv.ai}"
 CA_PEM_NAME="${CA_PEM_NAME:-ca}"
 CFSSL_CONFIG_NAME="${CFSSL_CONFIG_NAME:-cfssl.json}"
 CLI_NAME="${CLI_NAME:-cli}"
 CLIENT_NAME="${CLIENT_NAME:-client}"
-CONFIG_DIR_NAME="${CONFIG_DIR_NAME:-configs}"
-SECRET_DIR_NAME="${SECRET_DIR_NAME:-secrets}"
 SERVER_NAME="${SERVER_NAME:-server}"
-TLS_DIR_NAME="${TLS_DIR_NAME:-tls}"
 
-CFSSL_DIR="${CFSSL_DIR:-$SCRIPTS_DIR_PARENT/$CONFIG_DIR_NAME/cfssl}"
-JAIL="${JAIL:-$SCRIPTS_DIR_PARENT/$SECRET_DIR_NAME/$CA_CN}"
-
-JAIL_DIR_TLS="${JAIL_DIR_TLS:-$JAIL/$TLS_DIR_NAME}"
+JAIL_DIR_TLS="${JAIL_DIR_TLS:-$JAIL/$CA_CN/tls}"
 
 CA_CERT="${CA_CERT:-$JAIL_DIR_TLS/$CA_PEM_NAME}.pem"
 CA_PRIVKEY="${CA_PRIVKEY:-$JAIL_DIR_TLS/$CA_PEM_NAME}-key.pem"
@@ -47,80 +47,107 @@ declare -A EFFECTIVE_INTERFACE=(
   [SERVER_NAME]=$SERVER_NAME
 )
 
-######################## UTILS
-for util in $SCRIPTS_DIR/utils/*.sh; do
-  source $util
-done
-
 ######################## CREDIT CHECK
 echo_debug_interface
 
-throw_missing_program cfssl 400 'sudo apt install golang-cfssl'
-throw_missing_program cfssljson 400 'sudo apt install golang-cfssl'
-throw_missing_program jq 400 'sudo apt install jq'
+throw_missing_program cfssl 404 'sudo apt install golang-cfssl'
+throw_missing_program cfssljson 404 'sudo apt install golang-cfssl'
+throw_missing_program jq 404 'sudo apt install jq'
 
-throw_missing_dir $CFSSL_DIR 400 'cant find certificate authority configuration files'
-throw_missing_dir $JAIL 400 "mkdir -p $JAIL"
+throw_missing_dir $CFSSL_DIR 404 'cant find cfssl configuration files'
+throw_missing_dir $JAIL 404 "mkdir -p $JAIL"
 
 ######################## FNS
 ## reusable
 create_tls_dir() {
-  mkdir -p $JAIL_DIR_TLS
+  mkdir -p ${1:-JAIL_DIR_TLS}
 }
 chmod_cert_files() {
-  throw_missing_dir $JAIL_DIR_TLS 500 'invoke $create_tls_dir before calling this fn'
+  declare -i pub_perm=0644
+  declare -i prv_perm=0640
+  request_sudo "setting permissions on new TLS certs\n[FILES]$JAIL_DIR_TLS/*.pem \n\n[$pub_perm] *.pem\n[$prv_perm] *-key.pem"
 
-  request_sudo "sudo required to chmod $JAIL_DIR_TLS/*.pem files"
+  sudo chmod $pub_perm $JAIL_DIR_TLS/*.pem
+  sudo chmod $prv_perm $JAIL_DIR_TLS/*key.pem
+}
+get_cfssl_config() {
+  local use_cfssl_config=${1:-$CFSSL_CONFIG_NAME}
+  local use_cn_config_dir=${2:-CFSSL_DIR}
 
-  sudo chmod 0644 $JAIL_DIR_TLS/*.pem
-  sudo chmod 0640 $JAIL_DIR_TLS/*key.pem
+  if test -f "${use_cn_config_dir}/${use_cfssl_config}"; then
+    echo "${use_cn_config_dir}/${use_cfssl_config}"
+    return 0
+  else
+    # go up 1 directory
+    # just incase they didnt follow instructions
+    # and put the cfssl.json in the cfssl dir instead of the CA_CN dir
+    # lol i did this like 3 times like wtf
+    use_cn_config_dir=$(dirname $use_cn_config_dir)
+    if test -f "${use_cn_config_dir}/${use_cfssl_config}"; then
+      echo "${use_cn_config_dir}/${use_cfssl_config}"
+      return 0
+    else
+      # use the hardcoded configs/cfssl.json and throw if missing
+      use_cfssl_config="${CFSSL_DIR}/cfssl.json"
+      throw_missing_file $use_cfssl_config 404 "cfssl configuration required"
+
+      echo "$use_cfssl_config"
+      return 0
+    fi
+  fi
 }
 
 ## actions
 create_root_ca() {
-  local CA_CONFIG_DIR="${CFSSL_DIR}/${1:-$CA_CN}"
+  local use_ca_cn="${1:-$CA_CN}"
+  local CA_CONFIG_DIR="${CFSSL_DIR}/${use_ca_cn}"
 
   local CA_CONFIG_FILE="${CA_CONFIG_DIR}/csr.root.ca.json"
-
-  throw_missing_file $CA_CONFIG_FILE 400 "root ca configuration file not found"
+  throw_missing_file $CA_CONFIG_FILE 404 "root ca configuration file"
 
   echo_debug "creating rootca with config: $(cat $CA_CONFIG_FILE | jq)"
-  create_tls_dir
-  cfssl genkey -initca $CA_CONFIG_FILE | cfssljson -bare $JAIL_DIR_TLS/${2:-$CA_PEM_NAME}
+
+  local this_jail_tls_dir="${JAIL}/${use_ca_cn}/tls"
+  create_tls_dir $this_jail_tls_dir
+
+  cfssl genkey -initca $CA_CONFIG_FILE | cfssljson -bare "$this_jail_tls_dir/${2:-$CA_PEM_NAME}"
   chmod_cert_files
 }
-
 create_server_cert() {
   local total=${1:-1}
-  local CA_CN=${2:-$CA_CN}
+  local use_ca_cn=${2:-$CA_CN}
   local CA_PEM_NAME=${3:-$CA_PEM_NAME}
   local SERVER_NAME=${4:-$SERVER_NAME}
+  local use_cfssl_config_name=${5:-$CFSSL_CONFIG_NAME}
 
-  local CA_CERT="${JAIL_DIR_TLS}/${CA_PEM_NAME}.pem"
-  local CA_PRIVKEY="${JAIL_DIR_TLS}/${CA_PEM_NAME}-key.pem"
-  local CN_CONFIG_DIR="${CFSSL_DIR}/${CA_CN}"
+  local this_jail_tls_dir="${JAIL}/${use_ca_cn}/tls"
+  local CA_CERT="${this_jail_tls_dir}/${CA_PEM_NAME}.pem"
+  local CA_PRIVKEY="${this_jail_tls_dir}/${CA_PEM_NAME}-key.pem"
+  create_tls_dir $this_jail_tls_dir
 
+  local CN_CONFIG_DIR="${CFSSL_DIR}/${use_ca_cn}"
   local SERVER_CONFIG="${CN_CONFIG_DIR}/csr.server.${SERVER_NAME}.json"
-  throw_missing_file $SERVER_CONFIG 400 'couldnt find server csr config'
+  throw_missing_file $SERVER_CONFIG 404 'couldnt find server csr config'
 
-  if test -n ${5:-''}; then
-    local CFFSL_CONFIG="${CN_CONFIG_DIR}/$5"
-    throw_missing_file $CFFSL_CONFIG 400 'couldnt find server cfssl config'
-  else
-    local CFFSL_CONFIG="${CFSSL_DIR}/${CFSSL_CONFIG_NAME}"
-    throw_missing_file $CFFSL_CONFIG 400 'couldnt find default cfssl config'
-  fi
+  local use_cfssl_config="$(get_cfssl_config $use_cfssl_config_name $CN_CONFIG_DIR)"
 
   echo_debug "creating $total server certificates"
 
-  i=0
+  declare -i i=0
   while [ $i -lt $total ]; do
+    if test -f ${this_jail_tls_dir}/$SERVER_NAME-${i}.pem; then
+      echo_debug "[INFO] $SERVER_NAME-${i}.pem exists; skipping"
+      i=$((i + 1))
+      continue
+    fi
+
     cfssl gencert \
       -ca=$CA_CERT \
       -ca-key=$CA_PRIVKEY \
-      -config=$CFFSL_CONFIG \
+      -config=$use_cfssl_config \
       $SERVER_CONFIG |
-      cfssljson -bare "${JAIL_DIR_TLS}/$SERVER_NAME-${i}" || true # doesnt overwrite existing tokens
+      cfssljson -bare "${this_jail_tls_dir}/$SERVER_NAME-${i}" || true # doesnt overwrite existing tokens
+
     i=$((i + 1))
   done
 
@@ -129,35 +156,39 @@ create_server_cert() {
 
 create_client_cert() {
   local total=${1:-1}
-  local CA_CN=${2:-$CA_CN}
+  local use_ca_cn=${2:-$CA_CN}
   local CA_PEM_NAME=${3:-$CA_PEM_NAME}
   local CLIENT_NAME=${4:-$CLIENT_NAME}
+  local use_cfssl_config_name=${5:-$CFSSL_CONFIG_NAME}
 
-  local CA_CERT="${JAIL_DIR_TLS}/${CA_PEM_NAME}.pem"
-  local CA_PRIVKEY="${JAIL_DIR_TLS}/${CA_PEM_NAME}-key.pem"
-  local CN_CONFIG_DIR="${CFSSL_DIR}/${CA_CN}"
+  local this_jail_tls_dir="${JAIL}/${use_ca_cn}/tls"
+  local CA_CERT="${this_jail_tls_dir}/${CA_PEM_NAME}.pem"
+  local CA_PRIVKEY="${this_jail_tls_dir}/${CA_PEM_NAME}-key.pem"
+  create_tls_dir $this_jail_tls_dir
 
+  local CN_CONFIG_DIR="${CFSSL_DIR}/${use_ca_cn}"
   local CLIENT_CONFIG="${CN_CONFIG_DIR}/csr.client.${CLIENT_NAME}.json"
-  throw_missing_file $CLIENT_CONFIG 400 'couldnt find client csr config'
+  throw_missing_file $CLIENT_CONFIG 404 'couldnt find client csr config'
 
-  if test -n ${5:-''}; then
-    local CFFSL_CONFIG="${CN_CONFIG_DIR}/$5"
-    throw_missing_file $CFFSL_CONFIG 400 'couldnt find client cfssl config'
-  else
-    local CFFSL_CONFIG="${CFSSL_DIR}/${CFSSL_CONFIG_NAME}"
-    throw_missing_file $CFFSL_CONFIG 400 'couldnt find default cfssl config'
-  fi
+  local use_cfssl_config="$(get_cfssl_config $use_cfssl_config_name $CN_CONFIG_DIR)"
 
   echo_debug "creating $total client certificates"
 
-  i=0
+  declare -i i=0
   while [ $i -lt $total ]; do
+    if test -f ${this_jail_tls_dir}/$CLIENT_NAME-${i}.pem; then
+      echo_debug "[INFO] $CLIENT_NAME-${i}.pem exists; skipping"
+      i=$((i + 1))
+      continue
+    fi
+
     cfssl gencert \
       -ca=$CA_CERT \
       -ca-key=$CA_PRIVKEY \
-      -config=$CFFSL_CONFIG \
+      -config=$use_cfssl_config \
       $CLIENT_CONFIG |
-      cfssljson -bare "${JAIL_DIR_TLS}/$CLIENT_NAME-${i}" || true # doesnt overwrite existing tokens
+      cfssljson -bare "${this_jail_tls_dir}/$CLIENT_NAME-${i}" || true # doesnt overwrite existing tokens
+
     i=$((i + 1))
   done
 
@@ -166,36 +197,39 @@ create_client_cert() {
 
 create_cli_cert() {
   local total=${1:-1}
-  local CA_CN=${2:-$CA_CN}
+  local use_ca_cn=${2:-$CA_CN}
   local CA_PEM_NAME=${3:-$CA_PEM_NAME}
   local CLI_NAME=${4:-$CLI_NAME}
+  local use_cfssl_config_name=${5:-$CFSSL_CONFIG_NAME}
 
+  local this_jail_tls_dir="${JAIL}/${use_ca_cn}/tls"
   local CA_CERT="${JAIL_DIR_TLS}/${CA_PEM_NAME}.pem"
   local CA_PRIVKEY="${JAIL_DIR_TLS}/${CA_PEM_NAME}-key.pem"
-  local CN_CONFIG_DIR="${CFSSL_DIR}/${CA_CN}"
+  create_tls_dir $this_jail_tls_dir
 
+  local CN_CONFIG_DIR="${CFSSL_DIR}/${use_ca_cn}"
   local CLI_CONFIG="${CN_CONFIG_DIR}/csr.cli.${CLI_NAME}.json"
-  throw_missing_file $CLI_CONFIG 400 'couldnt find cli csr config'
+  throw_missing_file $CLI_CONFIG 404 'couldnt find cli csr config'
 
-  if test -n ${5:-''}; then
-    local CFFSL_CONFIG="${CN_CONFIG_DIR}/$5"
-    throw_missing_file $CFFSL_CONFIG 400 'couldnt find cli cfssl config'
-  else
-    local CFFSL_CONFIG="${CFSSL_DIR}/${CFSSL_CONFIG_NAME}"
-    throw_missing_file $CFFSL_CONFIG 400 'couldnt find default cfssl config'
-  fi
+  local use_cfssl_config="$(get_cfssl_config $use_cfssl_config_name $CN_CONFIG_DIR)"
 
   echo_debug "creating $total cli certificates"
 
   i=0
   while [ $i -lt $total ]; do
+    if test -f "${this_jail_tls_dir}/$CLI_NAME-${i}.pem"; then
+      echo_debug "[INFO] $CLI_NAME-${i}.pem exists; skipping"
+      i=$((i + 1))
+      continue
+    fi
+
     cfssl gencert \
       -ca=$CA_CERT \
       -ca-key=$CA_PRIVKEY \
-      -config=$CFFSL_CONFIG \
+      -config=$use_cfssl_config \
       -profile=client \
       $CLI_CONFIG |
-      cfssljson -bare "${JAIL_DIR_TLS}/$CLI_NAME-${i}" || true # doesnt overwrite existing tokens
+      cfssljson -bare "${this_jail_tls_dir}/$CLI_NAME-${i}" || true # doesnt overwrite existing tokens
     i=$((i + 1))
   done
 
@@ -211,14 +245,14 @@ info)
   case $what in
   cert)
     pem_file="${JAIL_DIR_TLS}/${3:?'pem name is required'}.pem"
-    throw_missing_file $pem_file 400 'couldnt find local cert file'
+    throw_missing_file $pem_file 404 'couldnt find local cert file'
 
     echo_debug 'retrieving data from local certificate file'
     cfssl certinfo -cert $pem_file
     ;;
   csr)
     csr_file="${JAIL_DIR_TLS}/${3:?'csr name is required'}.csr"
-    throw_missing_file $csr_file 400 'couldnt find local csr file'
+    throw_missing_file $csr_file 404 'couldnt find local csr file'
 
     echo_debug 'retrieving data from local CSR file'
     cfssl certinfo -csr $csr_file
