@@ -257,6 +257,16 @@ get)
     id=${4:-''}
 
     case $getwhat in
+    root)
+      throw_missing_file $JAIL_VAULT_UNSEAL_TOKENS 404 'unseal token file doesnt exist'
+
+      echo $(
+        cat $JAIL_VAULT_UNSEAL_TOKENS |
+          jq -r '.root_token' |
+          base64 --decode |
+          gpg -dq
+      )
+      ;;
     self)
       echo_debug 'running credit check...'
       vault_curl_auth $VAULT_API/$TOKEN_INFO_SELF
