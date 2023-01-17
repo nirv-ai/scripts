@@ -95,3 +95,8 @@ dk_rm_all() {
 
 }
 export -f dk_rm_all
+
+dk_stop_rm_cunts() {
+    docker ps -aq | xargs docker stop | xargs docker rm
+}
+export -f dk_stop_rm_cunts

@@ -1,5 +1,21 @@
 #!/bin/false
+create_gpg_key() {
+  data=$(gpg --full-generate-key)
 
+  echo $data
+}
+save_gpg_key_asc() {
+  echo -e "-----BEGIN PGP PUBLIC KEY BLOCK-----\n" >$2
+  gpg --armor --export "$1" | base64 >>$2
+  echo "-----END PGP PUBLIC KEY BLOCK-----" >>$2
+}
+sync_vault_confs() {
+  rsync -a --delete $VAULT_CONFIG_DIR/ $VAULT_APP_CONFIG_DIR
+}
+rm_app_data_dir() {
+  request_sudo "wiping data from\n$VAULT_APP_DIR_DATA"
+  sudo rm -rf $VAULT_APP_DIR_DATA/*
+}
 get_payload_path() {
   local path=${1:?'cant get unknown path: string not provided'}
 

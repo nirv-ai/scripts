@@ -11,7 +11,7 @@ catch_then_exit() {
   if [ "$1" != "0" ]; then
     NIRV_SCRIPT_DEBUG=1
     echo_debug_interface
-    echo_err "[EXIT CODE]: $1"
+    echo_err "[EXIT CODE]: $1 $2"
   fi
 }
 throw_missing_file() {

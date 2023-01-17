@@ -15,19 +15,21 @@ done
 
 ######################## INTERFACE
 # group by increasing order of dependency
+APP_TARGET=''
 JAIL_VAULT_ADMIN="${JAIL_VAULT_PGP_DIR:-${JAIL}/vault/tokens/admin}"
 JAIL_VAULT_OTHER="${OTHER_TOKEN_DIR:-${JAIL}/vault/tokens/other}"
 JAIL_VAULT_ROOT="${JAIL_VAULT_ROOT:-${JAIL}/vault/tokens/root}"
+VAULT_ADMIN_NAME="${VAULT_ADMIN_NAME:-admin}"
 VAULT_API="${VAULT_ADDR:?VAULT_ADDR not set: exiting}/v1"
 VAULT_APP_SRC_PATH='src/vault'
 VAULT_SERVER_APP_NAME='core-vault'
-VAULT_TOKEN="${VAULT_TOKEN:?VAULT_TOKEN not set: exiting}"
+VAULT_TOKEN="${VAULT_TOKEN:-''}"
 
 JAIL_VAULT_ROOT_PGP_KEY="${JAIL_VAULT_ROOT}/root.asc"
 JAIL_VAULT_UNSEAL_TOKENS="${JAIL_VAULT_ROOT}/unseal_tokens.json"
-VAULT_APP_CONFIG_DIR="$(get_app_dir $VAULT_SERVER_APP_NAME $VAULT_APP_SRC_PATH/config)"
-
-VAULT_APP_TARGET="${VAULT_APP_CONFIG_DIR}/${VAULT_APP_TARGET:-''}"
+VAULT_APP_DIR_CONFIG="$(get_app_dir $VAULT_SERVER_APP_NAME $VAULT_APP_SRC_PATH/config)"
+VAULT_APP_DIR_DATA="$(get_app_dir $VAULT_SERVER_APP_NAME $VAULT_APP_SRC_PATH/data)"
+VAULT_APP_TARGET="${VAULT_APP_DIR_CONFIG}/${APP_TARGET:-''}"
 
 # VAULT FEATURE PATHS
 # TODO any changes require config updates
@@ -36,45 +38,50 @@ SECRET_KV2=secret
 DB_ENGINE=database
 AUTH_APPROLE=auth/approle
 
-source $SCRIPTS_DIR/vault/script.vault.http.sh
-
 declare -A EFFECTIVE_INTERFACE=(
   [AUTH_APPROLE]=$AUTH_APPROLE
   [DB_ENGINE]=$DB_ENGINE
   [DOCS_URI]=$DOCS_URI
   [JAIL_VAULT_ADMIN]=$JAIL_VAULT_ADMIN
   [JAIL_VAULT_OTHER]=$JAIL_VAULT_OTHER
+  [JAIL_VAULT_ROOT_PGP_KEY]=$JAIL_VAULT_ROOT_PGP_KEY
   [JAIL_VAULT_ROOT]=$JAIL_VAULT_ROOT
+  [JAIL_VAULT_UNSEAL_TOKENS]=$JAIL_VAULT_UNSEAL_TOKENS
   [SCRIPTS_DIR_PARENT]=$SCRIPTS_DIR_PARENT
   [SECRET_KV1]=$SECRET_KV1
   [SECRET_KV2]=$SECRET_KV2
   [VAULT_API]=$VAULT_API
-  [VAULT_APP_CONFIG_DIR]=$VAULT_APP_CONFIG_DIR
+  [VAULT_APP_DIR_CONFIG]=$VAULT_APP_DIR_CONFIG
+  [VAULT_APP_DIR_DATA]=$VAULT_APP_DIR_DATA
   [VAULT_APP_TARGET]=$VAULT_APP_TARGET
+
 )
 
 ######################## CREDIT CHECK
 echo_debug_interface
 
-throw_missing_dir $SCRIPT_DIR_PARENT 500 "somethings wrong: cant find myself in filesystem"
+throw_missing_dir $SCRIPTS_DIR_PARENT 500 "somethings wrong: cant find myself in filesystem"
 
-throw_missing_program curl 400 '@see https://curl.se/download.html'
-throw_missing_program jq 400 '@see https://stedolan.github.io/jq/'
+throw_missing_program curl 404 '@see https://curl.se/download.html'
+throw_missing_program jq 404 '@see https://stedolan.github.io/jq/'
+throw_missing_program rsync 404 '@see https://github.com/WayneD/rsync'
+throw_missing_program gpg 404 '@see https://docs.github.com/en/authentication/managing-commit-signature-verification/generating-a-new-gpg-key'
 
 # create secret dirs
 mkdir -p $JAIL_VAULT_ADMIN
 mkdir -p $JAIL_VAULT_OTHER
 mkdir -p $JAIL_VAULT_ROOT
+
 ######################## FNS
 # VAULT UTILS
 for util in $SCRIPTS_DIR/vault/utils/*.sh; do
   source $util
 done
 
-exit 1
 ######################## EXECUTE
 cmd=${1:-''}
 case $cmd in
+sync-confs) sync_vault_confs ;;
 init) init_vault ${2:-2} ;;
 get_JAIL_VAULT_UNSEAL_TOKENS) get_JAIL_VAULT_UNSEAL_TOKENS ;;
 get_single_unseal_token)
@@ -154,6 +161,23 @@ patch)
   ;;
 create)
   case $2 in
+  gpg)
+    whose=${3:?'whose key are you creating?'}
+
+    case $whose in
+    root-key) create_gpg_key >$JAIL_VAULT_ROOT/root.raw ;;
+    root-asc) save_gpg_key_asc $4 $JAIL_VAULT_ROOT_PGP_KEY ;;
+    admin-key)
+      this_admin=${4:-$VAULT_ADMIN_NAME}
+      create_gpg_key >$JAIL_VAULT_ADMIN/$this_admin.raw
+      ;;
+    admin-asc)
+      this_admin=${5:-$VAULT_ADMIN_NAME}
+      save_gpg_key_asc $4 $JAIL_VAULT_ADMIN/$this_admin.asc
+      ;;
+    *) echo 'todo' ;;
+    esac
+    ;;
   secret)
     case $3 in
     kv2)
@@ -417,6 +441,7 @@ rm)
   id=${3:-''}
 
   case $rmwhat in
+  vault-data) rm_app_data_dir ;;
   secret)
     secret_path=${4:?'syntax: get secret kv[1|2] secretPath'}
     case $3 in
