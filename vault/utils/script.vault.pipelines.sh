@@ -26,7 +26,7 @@ init_vault() {
     -n=$KEY_SHARES \
     -t=$THRESHOLD \
     -root-token-pgp-key="$JAIL_VAULT_ROOT_PGP_KEY" \
-    -pgp-keys="$PGP_KEYS" >$JAIL/tokens/root/$JAIL_VAULT_UNSEAL_TOKENS.json
+    -pgp-keys="$PGP_KEYS" >$JAIL_VAULT_UNSEAL_TOKENS
 }
 
 should_process() {

@@ -5,9 +5,9 @@ create_gpg_key() {
   echo $data
 }
 save_gpg_key_asc() {
-  echo -e "-----BEGIN PGP PUBLIC KEY BLOCK-----\n" >$2
-  gpg --armor --export "$1" | base64 >>$2
-  echo "-----END PGP PUBLIC KEY BLOCK-----" >>$2
+  # @see https://github.com/helm/helm/issues/2843
+  # dont use --armor --export like github says, breaks vault
+  gpg --export "$1" | base64 >$2
 }
 sync_vault_confs() {
   rsync -a --delete $VAULT_CONFIG_DIR/ $VAULT_APP_CONFIG_DIR

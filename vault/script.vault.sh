@@ -165,11 +165,11 @@ create)
     whose=${3:?'whose key are you creating?'}
 
     case $whose in
-    root-key) create_gpg_key >$JAIL_VAULT_ROOT/root.raw ;;
+    root-key) create_gpg_key >$JAIL_VAULT_ROOT/root.gpg ;;
     root-asc) save_gpg_key_asc $4 $JAIL_VAULT_ROOT_PGP_KEY ;;
     admin-key)
       this_admin=${4:-$VAULT_ADMIN_NAME}
-      create_gpg_key >$JAIL_VAULT_ADMIN/$this_admin.raw
+      create_gpg_key >$JAIL_VAULT_ADMIN/$this_admin.gpg
       ;;
     admin-asc)
       this_admin=${5:-$VAULT_ADMIN_NAME}
