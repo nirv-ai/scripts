@@ -89,7 +89,7 @@ cmd=${1:-''}
 case $cmd in
 sync-confs) sync_vault_confs ;;
 init) init_vault ${2:-2} ;;
-get_JAIL_VAULT_UNSEAL_TOKENS) get_JAIL_VAULT_UNSEAL_TOKENS ;;
+get_unseal_tokens) get_unseal_tokens ;;
 get_single_unseal_token)
   token_index=${2-0}
   echo -e "\n----\n\n$(get_single_unseal_token $token_index)\n\n----\n"
