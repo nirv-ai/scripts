@@ -44,26 +44,41 @@ should_process() {
   return 0
 }
 process_vault_admins_in_dir() {
-  for policy in $VAULT_APP_CONFIG_DIR/*/vault-admin/policy_*.hcl; do
+  echo_debug "create admin policies: $VAULT_APP_DIR_CONFIG"
+  for policy in $VAULT_APP_DIR_CONFIG/*/vault-admin/policy_*.hcl; do
     test -f $policy || break
-    if ! should_process $policy; then continue; fi
+    if ! should_process $policy; then
+      echo_debug "policy not in target:\n$policy\n$VAULT_APP_TARGET"
+      continue
+    fi
 
     echo_debug "creating policy: $policy"
     create_policy $policy
   done
 
-  for token_config in $VAULT_APP_CONFIG_DIR/*/vault-admin/token_*.json; do
+  echo_debug "creating admin tokens: $VAULT_APP_DIR_CONFIG"
+  for token_config in $VAULT_APP_DIR_CONFIG/*/vault-admin/token_*.json; do
     test -f $token_config || break
-    if ! should_process $token_config; then continue; fi
+    if ! should_process $token_config; then
+      echo_debug "token not in target:\n$token_config\n$VAULT_APPT_TARGET"
+      continue
+    fi
 
     local token_name=$(get_file_name $token_config)
     echo_debug "creating admin token: $token_config"
-    vault_post_data "@${token_config}" $VAULT_ADDR/$TOKEN_CREATE_CHILD >$JAIL_VAULT_ADMIN/$token_name
+
+    PREV_DEBUG=$NIRV_SCRIPT_DEBUG
+    NIRV_SCRIPT_DEBUG=0
+
+    echo "useing addr: $VAULT_API/$TOKEN_CREATE_CHILD"
+    vault_post_data "@${token_config}" $VAULT_API/$TOKEN_CREATE_CHILD >$JAIL_VAULT_ADMIN/$token_name
+
+    NIRV_SCRIPT_DEBUG=$PREV_DEBUG
   done
 }
 
 process_policies_in_dir() {
-  for policy in $VAULT_APP_CONFIG_DIR/*/policy/policy_*.hcl; do
+  for policy in $VAULT_APP_DIR_CONFIG/*/policy/policy_*.hcl; do
     test -f $policy || break
     if ! should_process $policy; then continue; fi
 
@@ -72,7 +87,7 @@ process_policies_in_dir() {
   done
 }
 process_engine_configs() {
-  for engine_config in $VAULT_APP_CONFIG_DIR/*/secret-engine/secret_*.json; do
+  for engine_config in $VAULT_APP_DIR_CONFIG/*/secret-engine/secret_*.json; do
     test -f $engine_config || break
     if ! should_process $engine_config; then continue; fi
 
@@ -100,7 +115,7 @@ process_engine_configs() {
       case $3 in
       config)
         echo_debug "creating config for $engine_type enabled at path: $two"
-        vault_post_data "@${engine_config}" "$VAULT_ADDR/$two/$three"
+        vault_post_data "@${engine_config}" "$VAULT_API/$two/$three"
         ;;
       *) echo_debug "ignoring unknown file format: $engine_config_filename" ;;
       esac
@@ -111,13 +126,13 @@ process_engine_configs() {
       case $three in
       config)
         echo_debug "creating config for db: $two\n"
-        vault_post_data "@${engine_config}" "$VAULT_ADDR/$DB_CONFIG/$two"
-        vault_post_no_data "$VAULT_ADDR/$DB_ROTATE/$two"
+        vault_post_data "@${engine_config}" "$VAULT_API/$DB_CONFIG/$two"
+        vault_post_no_data "$VAULT_API/$DB_ROTATE/$two"
         ;;
 
       role)
         echo_debug "creating role ${four} for db ${two}\n"
-        vault_post_data "@${engine_config}" "$VAULT_ADDR/$DB_ROLES/$four"
+        vault_post_data "@${engine_config}" "$VAULT_API/$DB_ROLES/$four"
         ;;
       *) echo_debug "ignoring file with unknown format: $engine_config_filename" ;;
       esac
@@ -128,7 +143,7 @@ process_engine_configs() {
 }
 process_token_role_in_dir() {
 
-  for token_role in $VAULT_APP_CONFIG_DIR/*/token-role/token_role*.json; do
+  for token_role in $VAULT_APP_DIR_CONFIG/*/token-role/token_role*.json; do
     test -f $token_role || break
     if ! should_process $token_role; then continue; fi
 
@@ -148,7 +163,7 @@ process_token_role_in_dir() {
 
     # make request if 2 is set, but 3 isnt
     if test -n ${2:-''} && test -n ${3:-''} && test -z ${4:-''}; then
-      vault_post_data "@${token_role}" "$VAULT_ADDR/$TOKEN_CREATE_ROLE/${2}"
+      vault_post_data "@${token_role}" "$VAULT_API/$TOKEN_CREATE_ROLE/${2}"
     else
       echo_debug "ignoring file\ndidnt match expectations: $token_role_filename"
       echo_debug 'filename syntax: ^token_role.ROLE_NAME$\n'
@@ -159,7 +174,7 @@ process_tokens_in_dir() {
 
   mkdir -p $OTHER_TOKEN_DIR
 
-  for token_config in $VAULT_APP_CONFIG_DIR/*/token/token_create*; do
+  for token_config in $VAULT_APP_DIR_CONFIG/*/token/token_create*; do
     test -f $token_config || break
     if ! should_process $token_config; then continue; fi
 
@@ -186,16 +201,16 @@ process_tokens_in_dir() {
       echo_debug "\n$auth_scheme\n\n[ROLE_ID_FILE]: $ROLE_ID_FILE\n[SECRET_ID_FILE]: $CREDENTIAL_FILE\n"
 
       # save role-id
-      vault_curl_auth "$VAULT_ADDR/$AUTH_APPROLE_ROLE/$token_type/role-id" >$ROLE_ID_FILE
+      vault_curl_auth "$VAULT_API/$AUTH_APPROLE_ROLE/$token_type/role-id" >$ROLE_ID_FILE
 
       # save new secret-id for authenticating as role-id
-      vault_post_no_data "$VAULT_ADDR/$AUTH_APPROLE_ROLE/$token_type/secret-id" -X POST >$CREDENTIAL_FILE
+      vault_post_no_data "$VAULT_API/$AUTH_APPROLE_ROLE/$token_type/secret-id" -X POST >$CREDENTIAL_FILE
       ;;
     token_create_token_role)
       echo_debug "\n$auth_scheme\n\n[TOKEN_FILE]: $CREDENTIAL_FILE\n"
 
       # save new token for authenticating as token_role
-      vault_post_no_data $VAULT_ADDR/$TOKEN_CREATE_CHILD/$token_type >$CREDENTIAL_FILE
+      vault_post_no_data $VAULT_API/$TOKEN_CREATE_CHILD/$token_type >$CREDENTIAL_FILE
       ;;
     *) echo_debug "ignoring file with unknown format: $token_config" ;;
     esac
@@ -204,7 +219,7 @@ process_tokens_in_dir() {
 process_auths_in_dir() {
 
   # keeping case syntax as we'll likely integrate with more auth schemes
-  for auth_config in $VAULT_APP_CONFIG_DIR/*/auth/*.json; do
+  for auth_config in $VAULT_APP_DIR_CONFIG/*/auth/*.json; do
     test -f $auth_config || break
     if ! should_process $auth_config; then continue; fi
 
@@ -218,7 +233,7 @@ process_auths_in_dir() {
 }
 enable_something_in_dir() {
 
-  for feature in $VAULT_APP_CONFIG_DIR/*/enable-feature/enable*; do
+  for feature in $VAULT_APP_DIR_CONFIG/*/enable-feature/enable*; do
     test -f $feature || break
     if ! should_process $feature; then continue; fi
 
@@ -246,7 +261,7 @@ enable_something_in_dir() {
 }
 process_secret_data_in_dir() {
 
-  for secret_data in $VAULT_APP_CONFIG_DIR/*/secret-data/hydrate_*.json; do
+  for secret_data in $VAULT_APP_DIR_CONFIG/*/secret-data/hydrate_*.json; do
     test -f $secret_data || break
     if ! should_process $secret_data; then continue; fi
 
@@ -270,13 +285,13 @@ process_secret_data_in_dir() {
     'hydrate_kv1')
       echo_debug "\n$engine_type\n\n[ENGINE_PATH]: $engine_path\n[SECRET_PATH]: $secret_path\n"
 
-      vault_post_data "@${secret_data}" "$VAULT_ADDR/$SECRET_KV1/$secret_path"
+      vault_post_data "@${secret_data}" "$VAULT_API/$SECRET_KV1/$secret_path"
 
       ;;
     'hydrate_kv2')
       echo_debug "\n$engine_type\n\n[ENGINE_PATH]: $engine_path\n[SECRET_PATH]: $secret_path\n"
       payload_data=$(data_data_only $secret_data)
-      vault_post_data "${payload_data}" "$VAULT_ADDR/$SECRET_KV2_DATA/$secret_path" >/dev/null
+      vault_post_data "${payload_data}" "$VAULT_API/$SECRET_KV2_DATA/$secret_path" >/dev/null
       ;;
     *) echo_debug "ignoring file with unknown format: $secret_data" ;;
     esac

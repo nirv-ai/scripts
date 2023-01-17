@@ -10,7 +10,11 @@ save_gpg_key_asc() {
   gpg --export "$1" | base64 >$2
 }
 sync_vault_confs() {
-  rsync -a --delete $VAULT_CONFIG_DIR/ $VAULT_APP_CONFIG_DIR
+  throw_missing_dir $VAULT_CONFIG_DIR 404 'configs not where expected'
+
+  mkdir -p $VAULT_APP_DIR_CONFIG
+
+  rsync -a --delete $VAULT_CONFIG_DIR/ $VAULT_APP_DIR_CONFIG
 }
 rm_app_data_dir() {
   request_sudo "wiping data from\n$VAULT_APP_DIR_DATA"
@@ -65,7 +69,7 @@ create_policy() {
   payload_filename=$(get_filename_without_extension $payload_path)
 
   echo_debug "creating policy $payload_filename:\n$(cat $payload_path)"
-  vault_post_data "$payload_data" $VAULT_ADDR/$SYS_POLY_ACL/$payload_filename
+  vault_post_data "$payload_data" $VAULT_API/$SYS_POLY_ACL/$payload_filename
 }
 create_approle() {
   syntax='syntax: create_approle [/]path/to/distinct_role.json'
@@ -77,7 +81,7 @@ create_approle() {
   payload_filename=$(get_filename_without_extension $payload_path)
 
   echo_debug "creating approle $payload_filename:\n$(cat $payload_path)"
-  vault_post_data "@$payload_path" "$VAULT_ADDR/$AUTH_APPROLE_ROLE/$payload_filename"
+  vault_post_data "@$payload_path" "$VAULT_API/$AUTH_APPROLE_ROLE/$payload_filename"
 }
 enable_something() {
   # syntax: enable_something thisThing atThisPath
@@ -97,5 +101,5 @@ enable_something() {
     ;;
   *) invalid_request ;;
   esac
-  vault_post_data $data "$VAULT_ADDR/$URL"
+  vault_post_data $data "$VAULT_API/$URL"
 }

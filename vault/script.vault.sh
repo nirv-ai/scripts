@@ -22,6 +22,7 @@ JAIL_VAULT_ROOT="${JAIL_VAULT_ROOT:-${JAIL}/vault/tokens/root}"
 VAULT_ADMIN_NAME="${VAULT_ADMIN_NAME:-admin}"
 VAULT_API="${VAULT_ADDR:?VAULT_ADDR not set: exiting}/v1"
 VAULT_APP_SRC_PATH='src/vault'
+VAULT_CONFIG_DIR="${CONFIGS_DIR}/vault"
 VAULT_SERVER_APP_NAME='core-vault'
 VAULT_TOKEN="${VAULT_TOKEN:-''}"
 
@@ -29,7 +30,11 @@ JAIL_VAULT_ROOT_PGP_KEY="${JAIL_VAULT_ROOT}/root.asc"
 JAIL_VAULT_UNSEAL_TOKENS="${JAIL_VAULT_ROOT}/unseal_tokens.json"
 VAULT_APP_DIR_CONFIG="$(get_app_dir $VAULT_SERVER_APP_NAME $VAULT_APP_SRC_PATH/config)"
 VAULT_APP_DIR_DATA="$(get_app_dir $VAULT_SERVER_APP_NAME $VAULT_APP_SRC_PATH/data)"
-VAULT_APP_TARGET="${VAULT_APP_DIR_CONFIG}/${APP_TARGET:-''}"
+
+VAULT_APP_TARGET="${VAULT_APP_DIR_CONFIG}"
+if -n "$APP_TARGET"; then
+  VAULT_APP_TARGET="${VAULT_APP_TARGET}/${APP_TARGET}"
+fi
 
 # VAULT FEATURE PATHS
 # TODO any changes require config updates
@@ -54,6 +59,7 @@ declare -A EFFECTIVE_INTERFACE=(
   [VAULT_APP_DIR_CONFIG]=$VAULT_APP_DIR_CONFIG
   [VAULT_APP_DIR_DATA]=$VAULT_APP_DIR_DATA
   [VAULT_APP_TARGET]=$VAULT_APP_TARGET
+  [VAULT_CONFIG_DIR]=$VAULT_CONFIG_DIR
 
 )
 
@@ -266,6 +272,9 @@ get)
           base64 --decode |
           gpg -dq
       )
+      ;;
+    admin)
+      $whichadmin=${id:-$VAULT_ADMIN}
       ;;
     self)
       echo_debug 'running credit check...'
