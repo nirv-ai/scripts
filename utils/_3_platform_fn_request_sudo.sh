@@ -9,7 +9,7 @@ request_sudo() {
   if ! sudo -n true 2>/dev/null; then
     echo -e "\n[INFO] sudo requested"
     echo -e "------------------------\n"
-    echo -e "[CODE] 511: auth required"
+    echo -e "[CODE] 511 auth required"
     echo -e "[REASON] $NEEDED_FOR"
     echo -e "[REQUIRED BY] $0"
     echo -e "\n------------------------"

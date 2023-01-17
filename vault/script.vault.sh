@@ -3,7 +3,7 @@
 set -euo pipefail
 
 ######################## SETUP
-DOCS_URI='url for your readme file'
+DOCS_URI='https://github.com/nirv-ai/docs/tree/main/vault'
 SCRIPTS_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]%/}")" &>/dev/null && pwd)"
 
 SCRIPTS_DIR_PARENT="$(dirname $SCRIPTS_DIR)"
