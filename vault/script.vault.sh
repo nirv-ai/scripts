@@ -17,7 +17,7 @@ done
 # group by increasing order of dependency
 APP_TARGET=''
 JAIL_VAULT_ADMIN="${JAIL_VAULT_PGP_DIR:-${JAIL}/vault/tokens/admin}"
-JAIL_VAULT_OTHER="${OTHER_TOKEN_DIR:-${JAIL}/vault/tokens/other}"
+JAIL_VAULT_OTHER="${JAIL_VAULT_OTHER:-${JAIL}/vault/tokens/other}"
 JAIL_VAULT_ROOT="${JAIL_VAULT_ROOT:-${JAIL}/vault/tokens/root}"
 VAULT_ADMIN_NAME="${VAULT_ADMIN_NAME:-admin}"
 VAULT_API="${VAULT_ADDR:?VAULT_ADDR not set: exiting}/v1"
@@ -32,7 +32,7 @@ VAULT_APP_DIR_CONFIG="$(get_app_dir $VAULT_SERVER_APP_NAME $VAULT_APP_SRC_PATH/c
 VAULT_APP_DIR_DATA="$(get_app_dir $VAULT_SERVER_APP_NAME $VAULT_APP_SRC_PATH/data)"
 
 VAULT_APP_TARGET="${VAULT_APP_DIR_CONFIG}"
-if -n "$APP_TARGET"; then
+if test -n "$APP_TARGET"; then
   VAULT_APP_TARGET="${VAULT_APP_TARGET}/${APP_TARGET}"
 fi
 
@@ -274,7 +274,12 @@ get)
       )
       ;;
     admin)
-      $whichadmin=${id:-$VAULT_ADMIN}
+      whichadmin=${id:-$VAULT_ADMIN_NAME}
+      admin_token_file=$JAIL_VAULT_ADMIN/token_${whichadmin}_vault.json
+
+      throw_missing_file $admin_token_file 404 'unadmin token file doesnt exist'
+
+      echo $(cat $admin_token_file | jq -r '.auth.client_token')
       ;;
     self)
       echo_debug 'running credit check...'

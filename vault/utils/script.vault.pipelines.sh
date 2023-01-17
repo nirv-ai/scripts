@@ -70,7 +70,6 @@ process_vault_admins_in_dir() {
     PREV_DEBUG=$NIRV_SCRIPT_DEBUG
     NIRV_SCRIPT_DEBUG=0
 
-    echo "useing addr: $VAULT_API/$TOKEN_CREATE_CHILD"
     vault_post_data "@${token_config}" $VAULT_API/$TOKEN_CREATE_CHILD >$JAIL_VAULT_ADMIN/$token_name
 
     NIRV_SCRIPT_DEBUG=$PREV_DEBUG
@@ -172,7 +171,7 @@ process_token_role_in_dir() {
 }
 process_tokens_in_dir() {
 
-  mkdir -p $OTHER_TOKEN_DIR
+  mkdir -p $JAIL_VAULT_OTHER
 
   for token_config in $VAULT_APP_DIR_CONFIG/*/token/token_create*; do
     test -f $token_config || break
@@ -193,8 +192,8 @@ process_tokens_in_dir() {
     auth_scheme=${1:-''}
     token_type=${2:-''}
     token_name=${3:-''}
-    ROLE_ID_FILE="${OTHER_TOKEN_DIR}/${token_type}.id.json"
-    CREDENTIAL_FILE="${OTHER_TOKEN_DIR}/${token_type}.${token_name}.json"
+    ROLE_ID_FILE="${JAIL_VAULT_OTHER}/${token_type}.id.json"
+    CREDENTIAL_FILE="${JAIL_VAULT_OTHER}/${token_type}.${token_name}.json"
 
     case $auth_scheme in
     token_create_approle)

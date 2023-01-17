@@ -17,6 +17,11 @@ sync_vault_confs() {
   rsync -a --delete $VAULT_CONFIG_DIR/ $VAULT_APP_DIR_CONFIG
 }
 rm_app_data_dir() {
+  if test ${#VAULT_APP_DIR_DATA} -lt 20; then
+    echo_err "we dont rm -rf directories less than 20 chars"
+    echo_err "please manually remove content of vault data dir: $VAULT_APP_DIR_DATA"
+    exit 1
+  fi
   request_sudo "wiping data from\n$VAULT_APP_DIR_DATA"
   sudo rm -rf $VAULT_APP_DIR_DATA/*
 }
