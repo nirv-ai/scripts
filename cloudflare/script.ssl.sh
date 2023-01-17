@@ -63,8 +63,8 @@ create_tls_dir() {
   mkdir -p ${1:-JAIL_DIR_TLS}
 }
 chmod_cert_files() {
-  declare -i pub_perm=0644
-  declare -i prv_perm=0640
+  declare pub_perm=0644
+  declare prv_perm=0640
   request_sudo "setting permissions on new TLS certs\n[FILES]$JAIL_DIR_TLS/*.pem \n\n[$pub_perm] *.pem\n[$prv_perm] *-key.pem"
 
   sudo chmod $pub_perm $JAIL_DIR_TLS/*.pem
@@ -82,16 +82,20 @@ get_cfssl_config() {
     # just incase they didnt follow instructions
     # and put the cfssl.json in the cfssl dir instead of the CA_CN dir
     # lol i did this like 3 times like wtf
-    use_cn_config_dir=$(dirname $use_cn_config_dir)
-    if test -f "${use_cn_config_dir}/${use_cfssl_config}"; then
-      echo "${use_cn_config_dir}/${use_cfssl_config}"
+    next_cn_config_dir=$(dirname $use_cn_config_dir)
+    if test -f "${next_cn_config_dir}/${use_cfssl_config}"; then
+      echo "${next_cn_config_dir}/${use_cfssl_config}"
       return 0
     else
       # use the hardcoded configs/cfssl.json and throw if missing
-      use_cfssl_config="${CFSSL_DIR}/cfssl.json"
-      throw_missing_file $use_cfssl_config 404 "cfssl configuration required"
+      default_cfssl_config="${CFSSL_DIR}/cfssl.json"
 
-      echo "$use_cfssl_config"
+      if test ! -f $default_cfssl_config; then
+        # throw the original request
+        throw_missing_file "${use_cn_config_dir}/${use_cfssl_config}" 404 "cfssl configuration required"
+      fi
+
+      echo "$default_cfssl_config"
       return 0
     fi
   fi
@@ -110,7 +114,13 @@ create_root_ca() {
   local this_jail_tls_dir="${JAIL}/${use_ca_cn}/tls"
   create_tls_dir $this_jail_tls_dir
 
-  cfssl genkey -initca $CA_CONFIG_FILE | cfssljson -bare "$this_jail_tls_dir/${2:-$CA_PEM_NAME}"
+  local ca_file="$this_jail_tls_dir/${2:-$CA_PEM_NAME}"
+  if test -f "$ca_file.pem"; then
+    echo_debug "file already_exists:\n$ca_file"
+  else
+    cfssl genkey -initca $CA_CONFIG_FILE | cfssljson -bare "$ca_file"
+  fi
+
   chmod_cert_files
 }
 create_server_cert() {
