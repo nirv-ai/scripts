@@ -131,9 +131,11 @@ create_server_cert() {
   local use_cfssl_config_name=${5:-$CFSSL_CONFIG_NAME}
 
   local this_jail_tls_dir="${JAIL}/${use_ca_cn}/tls"
+
   local CA_CERT="${this_jail_tls_dir}/${CA_PEM_NAME}.pem"
   local CA_PRIVKEY="${this_jail_tls_dir}/${CA_PEM_NAME}-key.pem"
-  create_tls_dir $this_jail_tls_dir
+  throw_missing_file $CA_CERT 400 "create rootca before creating certs"
+  throw_missing_file $CA_PRIVKEY 400 "create rootca before creating certs"
 
   local CN_CONFIG_DIR="${CFSSL_DIR}/${use_ca_cn}"
   local SERVER_CONFIG="${CN_CONFIG_DIR}/csr.server.${SERVER_NAME}.json"
@@ -156,7 +158,7 @@ create_server_cert() {
       -ca-key=$CA_PRIVKEY \
       -config=$use_cfssl_config \
       $SERVER_CONFIG |
-      cfssljson -bare "${this_jail_tls_dir}/$SERVER_NAME-${i}" || true # doesnt overwrite existing tokens
+      cfssljson -bare "${this_jail_tls_dir}/$SERVER_NAME-${i}"
 
     i=$((i + 1))
   done
@@ -172,9 +174,11 @@ create_client_cert() {
   local use_cfssl_config_name=${5:-$CFSSL_CONFIG_NAME}
 
   local this_jail_tls_dir="${JAIL}/${use_ca_cn}/tls"
+
   local CA_CERT="${this_jail_tls_dir}/${CA_PEM_NAME}.pem"
   local CA_PRIVKEY="${this_jail_tls_dir}/${CA_PEM_NAME}-key.pem"
-  create_tls_dir $this_jail_tls_dir
+  throw_missing_file $CA_CERT 400 "create rootca before creating certs"
+  throw_missing_file $CA_PRIVKEY 400 "create rootca before creating certs"
 
   local CN_CONFIG_DIR="${CFSSL_DIR}/${use_ca_cn}"
   local CLIENT_CONFIG="${CN_CONFIG_DIR}/csr.client.${CLIENT_NAME}.json"
@@ -197,7 +201,7 @@ create_client_cert() {
       -ca-key=$CA_PRIVKEY \
       -config=$use_cfssl_config \
       $CLIENT_CONFIG |
-      cfssljson -bare "${this_jail_tls_dir}/$CLIENT_NAME-${i}" || true # doesnt overwrite existing tokens
+      cfssljson -bare "${this_jail_tls_dir}/$CLIENT_NAME-${i}"
 
     i=$((i + 1))
   done
@@ -213,9 +217,11 @@ create_cli_cert() {
   local use_cfssl_config_name=${5:-$CFSSL_CONFIG_NAME}
 
   local this_jail_tls_dir="${JAIL}/${use_ca_cn}/tls"
+
   local CA_CERT="${JAIL_DIR_TLS}/${CA_PEM_NAME}.pem"
   local CA_PRIVKEY="${JAIL_DIR_TLS}/${CA_PEM_NAME}-key.pem"
-  create_tls_dir $this_jail_tls_dir
+  throw_missing_file $CA_CERT 400 "create rootca before creating certs"
+  throw_missing_file $CA_PRIVKEY 400 "create rootca before creating certs"
 
   local CN_CONFIG_DIR="${CFSSL_DIR}/${use_ca_cn}"
   local CLI_CONFIG="${CN_CONFIG_DIR}/csr.cli.${CLI_NAME}.json"
@@ -239,7 +245,7 @@ create_cli_cert() {
       -config=$use_cfssl_config \
       -profile=client \
       $CLI_CONFIG |
-      cfssljson -bare "${this_jail_tls_dir}/$CLI_NAME-${i}" || true # doesnt overwrite existing tokens
+      cfssljson -bare "${this_jail_tls_dir}/$CLI_NAME-${i}"
     i=$((i + 1))
   done
 
