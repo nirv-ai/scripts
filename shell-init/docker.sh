@@ -19,7 +19,6 @@ export -f dk_show_hack_user_group
 
 # startup a registry
 # @see https://docs.docker.com/registry/deploying/
-# @see nirvai/scripts/script.registry.sh
 dk_start_registry() {
     docker run --rm -d -p 5001:5001 --restart=always --name registry registry:2
 }
@@ -27,8 +26,6 @@ export -f dk_start_registry
 
 dk_start_bash() {
     docker run --rm -it ubuntu:trusty bash
-    # ip addr show eth0 # get container ip
-    # route # get host IP
 }
 export -f dk_start_bash
 
@@ -43,7 +40,7 @@ dk_imgs() {
 export -f dk_imgs
 
 dk_see_me() {
-    docker run --rm -it alpine ping -c4 $(whatsmyip)
+    docker run --rm -it alpine ping -c4 $(whats_my_ip)
 }
 export -f dk_see_me
 
