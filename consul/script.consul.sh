@@ -27,6 +27,7 @@ CONSUL_CONF_SERVICE="${CONFIGS_DIR}/consul/service"
 CONSUL_DIR_CERTS="${CERTS_DIR_HOST}/${MESH_HOSTNAME}"
 CONSUL_GOSSIP_FILENAME='config.global.gossip.hcl'
 CONSUL_SERVER_APP_NAME='core-consul'
+CONSUL_SERVER_NODE_PREFIX='consul'
 DATA_CENTER='us-east'
 DNS_TOKEN_NAME='acl-policy-dns'
 JAIL_MESH_KEYS="${JAIL}/consul/keys"
@@ -49,6 +50,7 @@ declare -A EFFECTIVE_INTERFACE=(
   [CONSUL_CONF_SERVER]=$CONSUL_CONF_SERVER
   [CONSUL_CONF_SERVICE]=$CONSUL_CONF_SERVICE
   [CONSUL_DIR_CERTS]=$CONSUL_DIR_CERTS
+  [CONSUL_SERVER_NODE_PREFIX]=$CONSUL_SERVER_NODE_PREFIX
   [DATA_CENTER]=$DATA_CENTER
   [JAIL_KEY_GOSSIP]=$JAIL_KEY_GOSSIP
   [JAIL_MESH_TOKENS]=$JAIL_MESH_TOKENS
@@ -245,6 +247,47 @@ sync_local_configs() {
     validate_consul $svc_app/config || true # dont fail if error
   done
 }
+sync_env_auto() {
+  local services="$CONSUL_CONF_SERVICE"
+
+  echo "syncing server env if found: $CONSUL_SERVER_APP_NAME $CONSUL_SERVER_NODE_PREFIX $APP_ENV_AUTO"
+  local server_app_root_dir="$(get_app_dir $CONSUL_SERVER_APP_NAME)"
+  if test -d "$server_app_root_dir" && test -n "$CONSUL_SERVER_NODE_PREFIX"; then
+    env_auto_path="$server_app_root_dir/$APP_ENV_AUTO"
+
+    echo "syncing: $env_auto_path"
+
+    if test ! -f "$env_auto_path"; then
+      touch $env_auto_path
+    fi
+    # if line exists, replace it
+    # else insert it
+    # CONSUL_HTTP_TOKEN=$(get_token $JAIL_TOKEN_ROOT)
+    # CONSUL_DNS_TOKEN=$(get_token $JAIL_TOKEN_POLICY_DNS)
+    # CONSUL_NODE_PREFIX=$CONSUL_SERVER_NODE_PREFIX
+  fi
+
+  echo "syncing service(s) if any:\n$services"
+  for srv_conf in $services/*; do
+    test -d $srv_conf || break
+
+    local service_app_name=$(basename $srv_conf)
+    local service_app_root_dir=$(get_app_dir $service_app_name)
+
+    env_auto_path="$service_app_root_dir/$APP_ENV_AUTO"
+
+    echo "syncing: $env_auto_path"
+
+    if test ! -f "$env_auto_path"; then
+      touch $env_auto_path
+    fi
+
+    # if line exists, replace it
+    # else insert it
+    # CONSUL_HTTP_TOKEN=9eceb44f-e98d-cb16-614e-8dc1f257a3bc
+    # CONSUL_NODE_PREFIX=$service_app_name
+  done
+}
 ## todo
 # consul kv put consul/configuration/db_port 5432
 # consul kv get consul/configuration/db_port
@@ -259,6 +302,7 @@ cmd=${1:-''}
 
 case $cmd in
 sync-confs) sync_local_configs ;;
+sync-auto-env) sync_env_auto ;;
 reload) consul reload ;;
 validate)
   what=${2:-'hcl'}
@@ -288,12 +332,17 @@ get)
   what=${2:-''}
 
   case $what in
+  cli-env) echo "source $CONFIGS_DIR/consul/.env.cli" ;;
   info) consul info ;;
   team) consul members ;;
   nodes) consul catalog nodes -detailed ;;
   policy) consul acl policy read -id ${3:?'policy id required: use `list policies`'} ;;
   token-info) consul acl token read -id ${3:?'token axor id required: use `list tokens`'} ;;
-  root-token) get_token $JAIL_TOKEN_ROOT ;;
+  root-token)
+    if test -f $JAIL_TOKEN_ROOT; then
+      get_token $JAIL_TOKEN_ROOT
+    fi
+    ;;
   dns-token) get_token $JAIL_TOKEN_POLICY_DNS ;;
   server-token) get_token $JAIL_TOKEN_POLICY_SERVER ;;
   service-token)
