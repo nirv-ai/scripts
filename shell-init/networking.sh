@@ -1,46 +1,43 @@
 #!/usr/bin/env bash
 
-cmdtime() {
+cmd_time() {
     time "$@"
 }
-
 get_hosts() {
-    echo $(getent hosts)
+    getent hosts
 }
 get_networks() {
-    echo $(getent networks)
+    getent networks
 }
 get_services() {
-    echo $(getent services)
+    getent services
 }
-response_headers() {
+get_response_headers() {
     if [[ $# -eq 1 ]]; then
         curl -I "$1"
     else
         echo "\$1 === url"
     fi
 }
-
-response_time() {
+get_response_time() {
     if [[ $# -eq 1 ]]; then
-        cmdtime responseheaders "$1"
+        cmd_time get_response_headers "$1"
     else
         echo "\$1 === url"
     fi
 }
 
-response_dos() {
+do_response_dos() {
     if [[ $# -eq 1 ]]; then
         while true; do
-            responsetime "$1"
+            do_response_time "$1"
             sleep 0.1
         done
     else
         echo "\$1 === url"
     fi
 }
-
-waitforserviceonport() {
+wait_for_service_on_port() {
     if test $# -eq 2; then
         while true; do
             if test $(netstat -tulanp | grep "$2" | grep LISTEN); then
@@ -56,19 +53,25 @@ waitforserviceonport() {
         echo "\$2 === port"
     fi
 }
+list_connections() {
+    sudo netstat -tulpn
+}
+whats_my_ip_mac() {
+    ifconfig -a | grep inet
+}
+whats_my_ip_external() {
+    curl -s http://ipecho.net/plain
 
-# alias getwifi='sudo iwlist wlp3s0 scan | grep ESSID'
-alias whatsonport='sudo netstat -tulpn' # | grep 8080
-alias whatsmyipmac='ifconfig -a | grep inet'
-alias whatsmyipexternal='curl -s http://ipecho.net/plain'
-alias whatsmyipextended='curl http://ipinfo.io'
-
+}
+whats_my_ip_external_a() {
+    curl http://ipinfo.io
+}
 list_my_ips() {
-    echo $(ip r)
+    ip r
 }
 whats_my_ip() {
-    echo $(hostname -I | cut -d' ' -f1)
+    hostname -I | cut -d' ' -f1
 }
 whats_my_network_interface() {
-    echo $(ip a | grep $(whats_my_ip))
+    ip a | grep $(whats_my_ip)
 }
