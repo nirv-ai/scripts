@@ -16,6 +16,7 @@ done
 ######################## INTERFACE
 # group by increasing order of dependency
 
+CONSUL_APP_SRC_PATH='src/consul'
 CONSUL_CONF_CLIENT="${CONFIGS_DIR}/consul/client"
 CONSUL_CONF_DEFAULTS="${CONFIGS_DIR}/consul/defaults"
 CONSUL_CONF_GLOBALS="${CONFIGS_DIR}/consul/global"
@@ -23,13 +24,12 @@ CONSUL_CONF_INTENTS="${CONFIGS_DIR}/consul/intention"
 CONSUL_CONF_POLICY="${CONFIGS_DIR}/consul/policy"
 CONSUL_CONF_SERVER="${CONFIGS_DIR}/consul/server"
 CONSUL_CONF_SERVICE="${CONFIGS_DIR}/consul/service"
+CONSUL_DIR_CERTS="${CERTS_DIR_HOST}/${MESH_HOSTNAME}/tls"
 CONSUL_GOSSIP_FILENAME='config.global.gossip.hcl'
-CONSUL_APP_SRC_PATH='src/consul'
 CONSUL_SERVER_APP_NAME='core-consul'
 DATA_CENTER='us-east'
 DNS_TOKEN_NAME='acl-policy-dns'
 JAIL_MESH_KEYS="${JAIL}/consul/keys"
-JAIL_MESH_TLS="${JAIL}/${MESH_HOSTNAME}/tls"
 JAIL_MESH_TOKENS="${JAIL}/consul/tokens"
 ROOT_TOKEN_NAME='root'
 SERVER_TOKEN_NAME='acl-policy-consul'
@@ -40,6 +40,7 @@ JAIL_TOKEN_POLICY_SERVER="${JAIL_MESH_TOKENS}/token.${SERVER_TOKEN_NAME}.json"
 JAIL_TOKEN_ROOT="${JAIL_MESH_TOKENS}/token.${ROOT_TOKEN_NAME}.json"
 
 declare -A EFFECTIVE_INTERFACE=(
+  [CONSUL_APP_SRC_PATH]=$CONSUL_APP_SRC_PATH
   [CONSUL_CONF_CLIENT]=$CONSUL_CONF_CLIENT
   [CONSUL_CONF_DEFAULTS]=$CONSUL_CONF_DEFAULTS
   [CONSUL_CONF_GLOBALS]=$CONSUL_CONF_GLOBALS
@@ -47,11 +48,10 @@ declare -A EFFECTIVE_INTERFACE=(
   [CONSUL_CONF_POLICY]=$CONSUL_CONF_POLICY
   [CONSUL_CONF_SERVER]=$CONSUL_CONF_SERVER
   [CONSUL_CONF_SERVICE]=$CONSUL_CONF_SERVICE
-  [CONSUL_APP_SRC_PATH]=$CONSUL_APP_SRC_PATH
+  [CONSUL_DIR_CERTS]=$CONSUL_DIR_CERTS
   [DATA_CENTER]=$DATA_CENTER
-  [JAIL_MESH_TLS]=$JAIL_MESH_TLS
-  [JAIL_MESH_TOKENS]=$JAIL_MESH_TOKENS
   [JAIL_KEY_GOSSIP]=$JAIL_KEY_GOSSIP
+  [JAIL_MESH_TOKENS]=$JAIL_MESH_TOKENS
   [JAIL_TOKEN_POLICY_DNS]=$JAIL_TOKEN_POLICY_DNS
   [JAIL_TOKEN_POLICY_SERVER]=$JAIL_TOKEN_POLICY_SERVER
   [JAIL_TOKEN_ROOT]=$JAIL_TOKEN_ROOT
@@ -64,14 +64,14 @@ throw_missing_program consul 400 '@see https://developer.hashicorp.com/consul/do
 throw_missing_program jq 400 '@see https://stedolan.github.io/jq/'
 throw_missing_program nomad 400 "@see https://developer.hashicorp.com/nomad/tutorials/get-started/get-started-install"
 
-throw_missing_dir $JAIL 400 "mkdir -p $JAIL"
-throw_missing_dir $JAIL_MESH_TLS 400 '@see https://github.com/nirv-ai/docs/tree/main/cfssl'
 throw_missing_dir $CONSUL_CONF_CLIENT 400 '@see https://github.com/nirv-ai/configs/tree/develop/consul'
 throw_missing_dir $CONSUL_CONF_GLOBALS 400 '@see https://github.com/nirv-ai/configs/tree/develop/consul'
 throw_missing_dir $CONSUL_CONF_INTENTS 400 '@see https://github.com/nirv-ai/configs/tree/develop/consul'
 throw_missing_dir $CONSUL_CONF_POLICY 400 '@see https://github.com/nirv-ai/configs/tree/develop/consul'
 throw_missing_dir $CONSUL_CONF_SERVER 400 '@see https://github.com/nirv-ai/configs/tree/develop/consul'
 throw_missing_dir $CONSUL_CONF_SERVICE 400 '@see https://github.com/nirv-ai/configs/tree/develop/consul'
+throw_missing_dir $CONSUL_DIR_CERTS 400 '@see https://github.com/nirv-ai/docs/tree/main/cfssl'
+throw_missing_dir $JAIL 400 "mkdir -p $JAIL"
 
 ######################## FNS
 ## reusable
