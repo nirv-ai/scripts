@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 
 # nim
-alias cnim='choosenim'
-alias cnimlist='choosenim show'
-alias nimbuild='nimble build' # same as nimprodbuild
-alias nimdebugrun='nim c -r'
-alias nimdevbuild='nim c --verbosity:2'
-alias nimdevrun='nim c -r --verbosity:0'
-alias nimi='nimble install'
-alias niminit='nimble init'
-alias nimlist='nimble list'
-alias nimlistinstalled='nimble list --installed'
-alias nimprodbuild='nim -d:release c --verbosity:2'
-alias nimprodrun='nim -d:release c -r --verbosity:0'
-alias nimrefresh='nimble refresh'
+alias nim_c='choosenim'
+alias nimc_list='choosenim show'
+alias nim_build='nimble build' # same as nimprodbuild
+alias nim_debug_='nim c -r'
+alias nim_dev_build='nim c --verbosity:2'
+alias nim_dev_run='nim c -r --verbosity:0'
+alias nim_i='nimble install'
+alias nim_init='nimble init'
+alias nim_list='nimble list'
+alias nim_list_installed='nimble list --installed'
+alias nim_prod_build='nim -d:release c --verbosity:2'
+alias nim_prod_run='nim -d:release c -r --verbosity:0'
+alias nim_refresh='nimble refresh'
