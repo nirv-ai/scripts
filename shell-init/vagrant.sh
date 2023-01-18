@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
 # vagrant, overriding vgt i'll never use it
-
 alias vgt='vagrant'
 alias vgt_destroy='vagrant destroy' # delete everything, but keep vagrantfile
 alias vgt_list_boxes='vagrant box list'

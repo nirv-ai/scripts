@@ -1,74 +1,82 @@
 #!/usr/bin/env bash
 
-cmdtime() {
-    time "$@"
+cmd_time() {
+  time "$@"
 }
+export -f cmd_time
 
 get_hosts() {
-    echo $(getent hosts)
+  getent hosts
 }
+export -f get_hosts
+
 get_networks() {
-    echo $(getent networks)
+  getent networks
 }
-get_services() {
-    echo $(getent services)
-}
-response_headers() {
-    if [[ $# -eq 1 ]]; then
-        curl -I "$1"
-    else
-        echo "\$1 === url"
-    fi
-}
+export -f get_networks
 
-response_time() {
-    if [[ $# -eq 1 ]]; then
-        cmdtime responseheaders "$1"
-    else
-        echo "\$1 === url"
-    fi
+get_response_headers() {
+  if [[ $# -eq 1 ]]; then
+    curl -I "$1"
+  else
+    echo "\$1 === url"
+  fi
 }
+export -f get_response_headers
 
-response_dos() {
-    if [[ $# -eq 1 ]]; then
-        while true; do
-            responsetime "$1"
-            sleep 0.1
-        done
-    else
-        echo "\$1 === url"
-    fi
+get_response_time() {
+  if [[ $# -eq 1 ]]; then
+    cmd_time get_response_headers "$1"
+  else
+    echo "\$1 === url"
+  fi
 }
+export -f get_response_time
 
-waitforserviceonport() {
-    if test $# -eq 2; then
-        while true; do
-            if test $(netstat -tulanp | grep "$2" | grep LISTEN); then
-                echo "$1 is up on port $2"
-                break
-            else
-                echo "$1 is not up on port $2"
-                sleep 1
-            fi
-        done
-    else
-        echo "\$1 === service name"
-        echo "\$2 === port"
-    fi
+do_response_dos() {
+  if [[ $# -eq 1 ]]; then
+    while true; do
+      do_response_time "$1"
+      sleep 0.1
+    done
+  else
+    echo "\$1 === url"
+  fi
 }
+export -f do_response_dos
 
-# alias getwifi='sudo iwlist wlp3s0 scan | grep ESSID'
-alias whatsonport='sudo netstat -tulpn' # | grep 8080
-alias whatsmyipmac='ifconfig -a | grep inet'
-alias whatsmyipexternal='curl -s http://ipecho.net/plain'
-alias whatsmyipextended='curl http://ipinfo.io'
+list_connections() {
+  sudo netstat -tulpn
+}
+export -f list_connections
+
+whats_my_ip_mac() {
+  ifconfig -a | grep inet
+}
+export -f whats_my_ip_mac
+
+whats_my_ip_external() {
+  curl -s http://ipecho.net/plain
+
+}
+export -f whats_my_ip_external
+
+whats_my_ip_external_a() {
+  curl http://ipinfo.io
+}
+export -f whats_my_ip_external_a
 
 list_my_ips() {
-    echo $(ip r)
+  ip r
 }
+export -f list_my_ips
+
 whats_my_ip() {
-    echo $(hostname -I | cut -d' ' -f1)
+  hostname -I | cut -d' ' -f1
 }
+export -f whats_my_ip
+
 whats_my_network_interface() {
-    echo $(ip a | grep $(whats_my_ip))
+  ip a | grep $(whats_my_ip)
 }
+export -f whats_my_network_interface

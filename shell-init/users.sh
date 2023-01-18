@@ -7,18 +7,28 @@
 get_group_id() {
   echo $(id -g ${1:?'group name is required'})
 }
+export -f get_group_id
+
 get_user_id() {
   echo $(id -u ${1:?'user name is required'})
 }
+export -f get_user_id
+
 get_group() {
   echo $(getent group ${1:?'group name is required'})
 }
+export -f get_group
+
 get_groups_self() {
   echo $(groups)
 }
+export -f get_groups_self
+
 get_group_users() {
   echo $(getent group ${1:?'group name is required'})
 }
+export -f get_group_users
+
 create_group_system() {
   group_name=${1:?'group name is required'}
   user_name=${2:-$USER}
@@ -27,7 +37,8 @@ create_group_system() {
   sudo groupadd -fr $group_name
   sudo usermod -aG $group_name $user_name
 }
+export -f create_group_system
 
-delete_user_and_group_system() {
-  echo -e 'TODO: not implemented, @see delgroup -h'
-}
+# delete_user_and_group_system() {
+#   echo -e 'TODO: not implemented, @see delgroup -h'
+# }
