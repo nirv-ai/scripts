@@ -24,7 +24,7 @@ CONSUL_CONF_INTENTS="${CONFIGS_DIR}/consul/intention"
 CONSUL_CONF_POLICY="${CONFIGS_DIR}/consul/policy"
 CONSUL_CONF_SERVER="${CONFIGS_DIR}/consul/server"
 CONSUL_CONF_SERVICE="${CONFIGS_DIR}/consul/service"
-CONSUL_DIR_CERTS="${CERTS_DIR_HOST}/${MESH_HOSTNAME}/tls"
+CONSUL_DIR_CERTS="${CERTS_DIR_HOST}/${MESH_HOSTNAME}"
 CONSUL_GOSSIP_FILENAME='config.global.gossip.hcl'
 CONSUL_SERVER_APP_NAME='core-consul'
 DATA_CENTER='us-east'
@@ -60,18 +60,18 @@ declare -A EFFECTIVE_INTERFACE=(
 ######################## CREDIT CHECK
 echo_debug_interface
 
-throw_missing_program consul 400 '@see https://developer.hashicorp.com/consul/downloads'
-throw_missing_program jq 400 '@see https://stedolan.github.io/jq/'
-throw_missing_program nomad 400 "@see https://developer.hashicorp.com/nomad/tutorials/get-started/get-started-install"
+throw_missing_program consul 404 '@see https://developer.hashicorp.com/consul/downloads'
+throw_missing_program jq 404 '@see https://stedolan.github.io/jq/'
+throw_missing_program nomad 404 "@see https://developer.hashicorp.com/nomad/tutorials/get-started/get-started-install"
 
-throw_missing_dir $CONSUL_CONF_CLIENT 400 '@see https://github.com/nirv-ai/configs/tree/develop/consul'
-throw_missing_dir $CONSUL_CONF_GLOBALS 400 '@see https://github.com/nirv-ai/configs/tree/develop/consul'
-throw_missing_dir $CONSUL_CONF_INTENTS 400 '@see https://github.com/nirv-ai/configs/tree/develop/consul'
-throw_missing_dir $CONSUL_CONF_POLICY 400 '@see https://github.com/nirv-ai/configs/tree/develop/consul'
-throw_missing_dir $CONSUL_CONF_SERVER 400 '@see https://github.com/nirv-ai/configs/tree/develop/consul'
-throw_missing_dir $CONSUL_CONF_SERVICE 400 '@see https://github.com/nirv-ai/configs/tree/develop/consul'
-throw_missing_dir $CONSUL_DIR_CERTS 400 '@see https://github.com/nirv-ai/docs/tree/main/cfssl'
-throw_missing_dir $JAIL 400 "mkdir -p $JAIL"
+throw_missing_dir $CONSUL_CONF_CLIENT 404 '@see https://github.com/nirv-ai/configs/tree/develop/consul'
+throw_missing_dir $CONSUL_CONF_GLOBALS 404 '@see https://github.com/nirv-ai/configs/tree/develop/consul'
+throw_missing_dir $CONSUL_CONF_INTENTS 404 '@see https://github.com/nirv-ai/configs/tree/develop/consul'
+throw_missing_dir $CONSUL_CONF_POLICY 404 '@see https://github.com/nirv-ai/configs/tree/develop/consul'
+throw_missing_dir $CONSUL_CONF_SERVER 404 '@see https://github.com/nirv-ai/configs/tree/develop/consul'
+throw_missing_dir $CONSUL_CONF_SERVICE 404 '@see https://github.com/nirv-ai/configs/tree/develop/consul'
+throw_missing_dir $CONSUL_DIR_CERTS 404 '@see https://github.com/nirv-ai/docs/tree/main/cfssl'
+throw_missing_dir $JAIL 404 "mkdir -p $JAIL"
 
 ######################## FNS
 ## reusable
@@ -211,9 +211,8 @@ sync_local_configs() {
   local services="$CONSUL_CONF_SERVICE"
 
   echo_debug "syncing server if found: $CONSUL_SERVER_APP_NAME"
-  if test -d "$CONSUL_SERVER_APP_NAME"; then
-    local server_app_config_dir="$(get_app_dir $CONSUL_SERVER_APP_NAME $CONSUL_APP_SRC_PATH/config)"
-
+  local server_app_config_dir="$(get_app_dir $CONSUL_SERVER_APP_NAME $CONSUL_APP_SRC_PATH/config)"
+  if test -d "$server_app_config_dir"; then
     echo_debug "server confs:\n${server_configs[@]}"
     echo_debug "syncing: $server_app_config_dir"
 
