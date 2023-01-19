@@ -2,6 +2,7 @@
 
 set -euo pipefail
 
+# consul cmd cmd cmd --help has wonderful examples, thank me later
 ######################## SETUP
 DOCS_URI='https://github.com/nirv-ai/docs/blob/main/consul/README.md'
 SCRIPTS_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]%/}")" &>/dev/null && pwd)"
@@ -16,6 +17,7 @@ done
 ######################## INTERFACE
 # group by increasing order of dependency
 
+CONSUL_APP_SRC_PATH='src/consul'
 CONSUL_CONF_CLIENT="${CONFIGS_DIR}/consul/client"
 CONSUL_CONF_DEFAULTS="${CONFIGS_DIR}/consul/defaults"
 CONSUL_CONF_GLOBALS="${CONFIGS_DIR}/consul/global"
@@ -23,13 +25,13 @@ CONSUL_CONF_INTENTS="${CONFIGS_DIR}/consul/intention"
 CONSUL_CONF_POLICY="${CONFIGS_DIR}/consul/policy"
 CONSUL_CONF_SERVER="${CONFIGS_DIR}/consul/server"
 CONSUL_CONF_SERVICE="${CONFIGS_DIR}/consul/service"
+CONSUL_DIR_CERTS="${CERTS_DIR_HOST}/${MESH_HOSTNAME}"
 CONSUL_GOSSIP_FILENAME='config.global.gossip.hcl'
-CONSUL_APP_SRC_PATH='src/consul'
 CONSUL_SERVER_APP_NAME='core-consul'
+CONSUL_SERVER_NODE_PREFIX='consul'
 DATA_CENTER='us-east'
 DNS_TOKEN_NAME='acl-policy-dns'
 JAIL_MESH_KEYS="${JAIL}/consul/keys"
-JAIL_MESH_TLS="${JAIL}/${MESH_HOSTNAME}/tls"
 JAIL_MESH_TOKENS="${JAIL}/consul/tokens"
 ROOT_TOKEN_NAME='root'
 SERVER_TOKEN_NAME='acl-policy-consul'
@@ -40,6 +42,7 @@ JAIL_TOKEN_POLICY_SERVER="${JAIL_MESH_TOKENS}/token.${SERVER_TOKEN_NAME}.json"
 JAIL_TOKEN_ROOT="${JAIL_MESH_TOKENS}/token.${ROOT_TOKEN_NAME}.json"
 
 declare -A EFFECTIVE_INTERFACE=(
+  [CONSUL_APP_SRC_PATH]=$CONSUL_APP_SRC_PATH
   [CONSUL_CONF_CLIENT]=$CONSUL_CONF_CLIENT
   [CONSUL_CONF_DEFAULTS]=$CONSUL_CONF_DEFAULTS
   [CONSUL_CONF_GLOBALS]=$CONSUL_CONF_GLOBALS
@@ -47,11 +50,11 @@ declare -A EFFECTIVE_INTERFACE=(
   [CONSUL_CONF_POLICY]=$CONSUL_CONF_POLICY
   [CONSUL_CONF_SERVER]=$CONSUL_CONF_SERVER
   [CONSUL_CONF_SERVICE]=$CONSUL_CONF_SERVICE
-  [CONSUL_APP_SRC_PATH]=$CONSUL_APP_SRC_PATH
+  [CONSUL_DIR_CERTS]=$CONSUL_DIR_CERTS
+  [CONSUL_SERVER_NODE_PREFIX]=$CONSUL_SERVER_NODE_PREFIX
   [DATA_CENTER]=$DATA_CENTER
-  [JAIL_MESH_TLS]=$JAIL_MESH_TLS
-  [JAIL_MESH_TOKENS]=$JAIL_MESH_TOKENS
   [JAIL_KEY_GOSSIP]=$JAIL_KEY_GOSSIP
+  [JAIL_MESH_TOKENS]=$JAIL_MESH_TOKENS
   [JAIL_TOKEN_POLICY_DNS]=$JAIL_TOKEN_POLICY_DNS
   [JAIL_TOKEN_POLICY_SERVER]=$JAIL_TOKEN_POLICY_SERVER
   [JAIL_TOKEN_ROOT]=$JAIL_TOKEN_ROOT
@@ -60,18 +63,18 @@ declare -A EFFECTIVE_INTERFACE=(
 ######################## CREDIT CHECK
 echo_debug_interface
 
-throw_missing_program consul 400 '@see https://developer.hashicorp.com/consul/downloads'
-throw_missing_program jq 400 '@see https://stedolan.github.io/jq/'
-throw_missing_program nomad 400 "@see https://developer.hashicorp.com/nomad/tutorials/get-started/get-started-install"
+throw_missing_program consul 404 '@see https://developer.hashicorp.com/consul/downloads'
+throw_missing_program jq 404 '@see https://stedolan.github.io/jq/'
+throw_missing_program nomad 404 "@see https://developer.hashicorp.com/nomad/tutorials/get-started/get-started-install"
 
-throw_missing_dir $JAIL 400 "mkdir -p $JAIL"
-throw_missing_dir $JAIL_MESH_TLS 400 '@see https://github.com/nirv-ai/docs/tree/main/cfssl'
-throw_missing_dir $CONSUL_CONF_CLIENT 400 '@see https://github.com/nirv-ai/configs/tree/develop/consul'
-throw_missing_dir $CONSUL_CONF_GLOBALS 400 '@see https://github.com/nirv-ai/configs/tree/develop/consul'
-throw_missing_dir $CONSUL_CONF_INTENTS 400 '@see https://github.com/nirv-ai/configs/tree/develop/consul'
-throw_missing_dir $CONSUL_CONF_POLICY 400 '@see https://github.com/nirv-ai/configs/tree/develop/consul'
-throw_missing_dir $CONSUL_CONF_SERVER 400 '@see https://github.com/nirv-ai/configs/tree/develop/consul'
-throw_missing_dir $CONSUL_CONF_SERVICE 400 '@see https://github.com/nirv-ai/configs/tree/develop/consul'
+throw_missing_dir $CONSUL_CONF_CLIENT 404 '@see https://github.com/nirv-ai/configs/tree/develop/consul'
+throw_missing_dir $CONSUL_CONF_GLOBALS 404 '@see https://github.com/nirv-ai/configs/tree/develop/consul'
+throw_missing_dir $CONSUL_CONF_INTENTS 404 '@see https://github.com/nirv-ai/configs/tree/develop/consul'
+throw_missing_dir $CONSUL_CONF_POLICY 404 '@see https://github.com/nirv-ai/configs/tree/develop/consul'
+throw_missing_dir $CONSUL_CONF_SERVER 404 '@see https://github.com/nirv-ai/configs/tree/develop/consul'
+throw_missing_dir $CONSUL_CONF_SERVICE 404 '@see https://github.com/nirv-ai/configs/tree/develop/consul'
+throw_missing_dir $CONSUL_DIR_CERTS 404 '@see https://github.com/nirv-ai/docs/tree/main/cfssl'
+throw_missing_dir $JAIL 404 "mkdir -p $JAIL"
 
 ######################## FNS
 ## reusable
@@ -177,15 +180,27 @@ create_service_policy_tokens() {
       --format json >${JAIL_MESH_TOKENS}/token.$svc_name.json 2>/dev/null
   done
 }
-get_token() {
-  throw_missing_file $1 400 'cant find token file'
-  echo $(cat $1 | jq -r ".SecretID")
+# an operator/developer may not have read on tokens API
+# this is for retrieving tokens from a file
+get_token_from_file() {
+  token_name_or_file=${1:-'token filepath or name is required'}
+  case $token_name_or_file in
+  *.json)
+    throw_missing_file $token_name_or_file 400 "token file not found: $token_name_or_file"
+    echo $(cat $token_name_or_file | jq -r ".SecretID")
+    ;;
+  *)
+    local token_file="${JAIL_MESH_TOKENS}/token.${token_name_or_file}.json"
+    throw_missing_file $token_file 400 "token file not found:\n$token_file"
+    echo $(cat $token_file | jq -r ".SecretID")
+    ;;
+  esac
 }
 set_server_tokens() {
-  echo -e "setting tokens: wait for validation"
+  echo_debug "setting tokens: wait for validation"
   # the below swallows the errors
-  dns_token=$(get_token $JAIL_TOKEN_POLICY_DNS)
-  server_token=$(get_token $JAIL_TOKEN_POLICY_SERVER)
+  dns_token=$(get_token_from_file $JAIL_TOKEN_POLICY_DNS)
+  server_token=$(get_token_from_file $JAIL_TOKEN_POLICY_SERVER)
 
   # will log success if the above didnt exit
   # but success doesnt mean the acls/tokens are configured properly
@@ -211,9 +226,8 @@ sync_local_configs() {
   local services="$CONSUL_CONF_SERVICE"
 
   echo_debug "syncing server if found: $CONSUL_SERVER_APP_NAME"
-  if test -d "$CONSUL_SERVER_APP_NAME"; then
-    local server_app_config_dir="$(get_app_dir $CONSUL_SERVER_APP_NAME $CONSUL_APP_SRC_PATH/config)"
-
+  local server_app_config_dir="$(get_app_dir $CONSUL_SERVER_APP_NAME $CONSUL_APP_SRC_PATH/config)"
+  if test -d "$server_app_config_dir"; then
     echo_debug "server confs:\n${server_configs[@]}"
     echo_debug "syncing: $server_app_config_dir"
 
@@ -246,20 +260,56 @@ sync_local_configs() {
     validate_consul $svc_app/config || true # dont fail if error
   done
 }
-## todo
-# consul kv put consul/configuration/db_port 5432
-# consul kv get consul/configuration/db_port
-# dig @127.0.0.1 -p 8600 consul.service.consul
-# consul catalog services -tags
-# consul services register svc-db.hcl
-# curl 172.17.0.1:8500/v1/status/leader  #get the leader
-# consul cmd cmd cmd --help has wonderful examples, thank me later
-# curl --request GET http://127.0.0.1:8500/v1/agent/checks
+sync_env_auto() {
+  local services="$CONSUL_CONF_SERVICE"
+
+  echo_debug "syncing server env if found: $CONSUL_SERVER_APP_NAME $CONSUL_SERVER_NODE_PREFIX $APP_ENV_AUTO"
+  local server_app_root_dir="$(get_app_root $CONSUL_SERVER_APP_NAME)"
+  if test -d "$server_app_root_dir" && test -n "$CONSUL_SERVER_NODE_PREFIX"; then
+    env_auto_path="$server_app_root_dir/$APP_ENV_AUTO"
+
+    echo_debug "syncing: $env_auto_path"
+
+    if test ! -f "$env_auto_path"; then
+      echo '# managed by NIRV SCRIPTS' >$env_auto_path
+    fi
+
+    # delete any matching lines
+    sed -i '/^CONSUL_HTTP_TOKEN/d;/CONSUL_DNS_TOKEN/d;/CONSUL_NODE_PREFIX/d' $env_auto_path
+    # add new lines
+    sed -i "\$aCONSUL_DNS_TOKEN=$(get_token_from_file $JAIL_TOKEN_POLICY_DNS)" $env_auto_path
+    sed -i "\$aCONSUL_HTTP_TOKEN=$(get_token_from_file $JAIL_TOKEN_ROOT)" $env_auto_path
+    sed -i "\$aCONSUL_NODE_PREFIX=$CONSUL_SERVER_NODE_PREFIX" $env_auto_path
+  fi
+
+  echo_debug "syncing service(s) if any:\n$services/*"
+  for srv_conf in $services/*; do
+    test -d $srv_conf || break
+
+    local service_app_name=$(basename $srv_conf)
+    local service_app_root_dir=$(get_app_root $service_app_name)
+
+    env_auto_path="$service_app_root_dir/$APP_ENV_AUTO"
+
+    echo_debug "syncing: $env_auto_path"
+
+    if test ! -f "$env_auto_path"; then
+      echo '# managed by NIRV SCRIPTS' >$env_auto_path
+    fi
+
+    # delete any matching lines
+    sed -i '/^CONSUL_HTTP_TOKEN/d;/CONSUL_NODE_PREFIX/d' $env_auto_path
+    # add new lines
+    sed -i "\$aCONSUL_HTTP_TOKEN=$(get_token_from_file $service_app_name)" $env_auto_path
+    sed -i "\$aCONSUL_NODE_PREFIX=$service_app_name" $env_auto_path
+  done
+}
 
 cmd=${1:-''}
 
 case $cmd in
 sync-confs) sync_local_configs ;;
+sync-env-auto) sync_env_auto ;;
 reload) consul reload ;;
 validate)
   what=${2:-'hcl'}
@@ -272,7 +322,7 @@ set)
   what=${2:?''}
 
   case $what in
-  server-tokens) set_server_tokens ;;
+  server-tokens) set_server_tokens ;; # you should prefer sync-env-auto
   *) invalid_request ;;
   esac
   ;;
@@ -289,18 +339,20 @@ get)
   what=${2:-''}
 
   case $what in
+  cli-env) echo "source $CONFIGS_DIR/consul/.env.cli" ;;
   info) consul info ;;
   team) consul members ;;
   nodes) consul catalog nodes -detailed ;;
   policy) consul acl policy read -id ${3:?'policy id required: use `list policies`'} ;;
   token-info) consul acl token read -id ${3:?'token axor id required: use `list tokens`'} ;;
-  root-token) get_token $JAIL_TOKEN_ROOT ;;
-  dns-token) get_token $JAIL_TOKEN_POLICY_DNS ;;
-  server-token) get_token $JAIL_TOKEN_POLICY_SERVER ;;
-  service-token)
-    svc_name=${3:?'svc_name required'}
-    get_token ${JAIL_MESH_TOKENS}/token.${svc_name}.json
+  root-token)
+    if test -f $JAIL_TOKEN_ROOT; then
+      get_token_from_file $JAIL_TOKEN_ROOT
+    fi
     ;;
+  dns-token) get_token_from_file $JAIL_TOKEN_POLICY_DNS ;;
+  server-token) get_token_from_file $JAIL_TOKEN_POLICY_SERVER ;;
+  token) get_token_from_file $3 ;;
   *) invalid_request ;;
   esac
   ;;

@@ -4,7 +4,9 @@
 ## you help to enforce a common interface
 
 APP_DIR_NAME="${APP_DIR_NAME:-apps}"
+APP_ENV_AUTO="${APP_ENV_AUTO:-.env.auto}"
 APP_PREFIX="${APP_PREFIX:-nirvai}"
+CERTS_DIR_HOST="${CERTS_DIR_HOST:-/etc/ssl/certs}"
 CONFIG_DIR_NAME="${CONFIG_DIR_NAME:-configs}"
 JAIL_DIR_NAME="${JAIL_DIR_NAME:-secrets}"
 MAD_HOSTNAME="${MAD_HOSTNAME:-mad.nirv.ai}"
