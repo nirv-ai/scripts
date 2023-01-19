@@ -197,7 +197,7 @@ get_token_from_file() {
   esac
 }
 set_server_tokens() {
-  echo -e "setting tokens: wait for validation"
+  echo_debug "setting tokens: wait for validation"
   # the below swallows the errors
   dns_token=$(get_token_from_file $JAIL_TOKEN_POLICY_DNS)
   server_token=$(get_token_from_file $JAIL_TOKEN_POLICY_SERVER)
@@ -268,7 +268,7 @@ sync_env_auto() {
   if test -d "$server_app_root_dir" && test -n "$CONSUL_SERVER_NODE_PREFIX"; then
     env_auto_path="$server_app_root_dir/$APP_ENV_AUTO"
 
-    echo "syncing: $env_auto_path"
+    echo_debug "syncing: $env_auto_path"
 
     if test ! -f "$env_auto_path"; then
       echo '# managed by NIRV SCRIPTS' >$env_auto_path
@@ -291,7 +291,7 @@ sync_env_auto() {
 
     env_auto_path="$service_app_root_dir/$APP_ENV_AUTO"
 
-    echo "syncing: $env_auto_path"
+    echo_debug "syncing: $env_auto_path"
 
     if test ! -f "$env_auto_path"; then
       echo '# managed by NIRV SCRIPTS' >$env_auto_path
@@ -322,7 +322,7 @@ set)
   what=${2:?''}
 
   case $what in
-  server-tokens) set_server_tokens ;;
+  server-tokens) set_server_tokens ;; # you should prefer sync-env-auto
   *) invalid_request ;;
   esac
   ;;
