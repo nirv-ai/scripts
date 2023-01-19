@@ -2,6 +2,7 @@
 
 set -euo pipefail
 
+# consul cmd cmd cmd --help has wonderful examples, thank me later
 ######################## SETUP
 DOCS_URI='https://github.com/nirv-ai/docs/blob/main/consul/README.md'
 SCRIPTS_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]%/}")" &>/dev/null && pwd)"
@@ -179,15 +180,27 @@ create_service_policy_tokens() {
       --format json >${JAIL_MESH_TOKENS}/token.$svc_name.json 2>/dev/null
   done
 }
-get_token() {
-  throw_missing_file $1 400 'cant find token file'
-  echo $(cat $1 | jq -r ".SecretID")
+# an operator/developer may not have read on tokens API
+# this is for retrieving tokens from a file
+get_token_from_file() {
+  token_name_or_file=${1:-'token filepath or name is required'}
+  case $token_name_or_file in
+  *.json)
+    throw_missing_file $token_name_or_file 400 "token file not found: $token_name_or_file"
+    echo $(cat $token_name_or_file | jq -r ".SecretID")
+    ;;
+  *)
+    local token_file="${JAIL_MESH_TOKENS}/token.${token_name_or_file}.json"
+    throw_missing_file $token_file 400 "token file not found:\n$token_file"
+    echo $(cat $token_file | jq -r ".SecretID")
+    ;;
+  esac
 }
 set_server_tokens() {
   echo -e "setting tokens: wait for validation"
   # the below swallows the errors
-  dns_token=$(get_token $JAIL_TOKEN_POLICY_DNS)
-  server_token=$(get_token $JAIL_TOKEN_POLICY_SERVER)
+  dns_token=$(get_token_from_file $JAIL_TOKEN_POLICY_DNS)
+  server_token=$(get_token_from_file $JAIL_TOKEN_POLICY_SERVER)
 
   # will log success if the above didnt exit
   # but success doesnt mean the acls/tokens are configured properly
@@ -250,59 +263,53 @@ sync_local_configs() {
 sync_env_auto() {
   local services="$CONSUL_CONF_SERVICE"
 
-  echo "syncing server env if found: $CONSUL_SERVER_APP_NAME $CONSUL_SERVER_NODE_PREFIX $APP_ENV_AUTO"
-  local server_app_root_dir="$(get_app_dir $CONSUL_SERVER_APP_NAME)"
+  echo_debug "syncing server env if found: $CONSUL_SERVER_APP_NAME $CONSUL_SERVER_NODE_PREFIX $APP_ENV_AUTO"
+  local server_app_root_dir="$(get_app_root $CONSUL_SERVER_APP_NAME)"
   if test -d "$server_app_root_dir" && test -n "$CONSUL_SERVER_NODE_PREFIX"; then
     env_auto_path="$server_app_root_dir/$APP_ENV_AUTO"
 
     echo "syncing: $env_auto_path"
 
     if test ! -f "$env_auto_path"; then
-      touch $env_auto_path
+      echo '# managed by NIRV SCRIPTS' >$env_auto_path
     fi
-    # if line exists, replace it
-    # else insert it
-    # CONSUL_HTTP_TOKEN=$(get_token $JAIL_TOKEN_ROOT)
-    # CONSUL_DNS_TOKEN=$(get_token $JAIL_TOKEN_POLICY_DNS)
-    # CONSUL_NODE_PREFIX=$CONSUL_SERVER_NODE_PREFIX
+
+    # delete any matching lines
+    sed -i '/^CONSUL_HTTP_TOKEN/d;/CONSUL_DNS_TOKEN/d;/CONSUL_NODE_PREFIX/d' $env_auto_path
+    # add new lines
+    sed -i "\$aCONSUL_DNS_TOKEN=$(get_token_from_file $JAIL_TOKEN_POLICY_DNS)" $env_auto_path
+    sed -i "\$aCONSUL_HTTP_TOKEN=$(get_token_from_file $JAIL_TOKEN_ROOT)" $env_auto_path
+    sed -i "\$aCONSUL_NODE_PREFIX=$CONSUL_SERVER_NODE_PREFIX" $env_auto_path
   fi
 
-  echo "syncing service(s) if any:\n$services"
+  echo_debug "syncing service(s) if any:\n$services/*"
   for srv_conf in $services/*; do
     test -d $srv_conf || break
 
     local service_app_name=$(basename $srv_conf)
-    local service_app_root_dir=$(get_app_dir $service_app_name)
+    local service_app_root_dir=$(get_app_root $service_app_name)
 
     env_auto_path="$service_app_root_dir/$APP_ENV_AUTO"
 
     echo "syncing: $env_auto_path"
 
     if test ! -f "$env_auto_path"; then
-      touch $env_auto_path
+      echo '# managed by NIRV SCRIPTS' >$env_auto_path
     fi
 
-    # if line exists, replace it
-    # else insert it
-    # CONSUL_HTTP_TOKEN=9eceb44f-e98d-cb16-614e-8dc1f257a3bc
-    # CONSUL_NODE_PREFIX=$service_app_name
+    # delete any matching lines
+    sed -i '/^CONSUL_HTTP_TOKEN/d;/CONSUL_NODE_PREFIX/d' $env_auto_path
+    # add new lines
+    sed -i "\$aCONSUL_HTTP_TOKEN=$(get_token_from_file $service_app_name)" $env_auto_path
+    sed -i "\$aCONSUL_NODE_PREFIX=$service_app_name" $env_auto_path
   done
 }
-## todo
-# consul kv put consul/configuration/db_port 5432
-# consul kv get consul/configuration/db_port
-# dig @127.0.0.1 -p 8600 consul.service.consul
-# consul catalog services -tags
-# consul services register svc-db.hcl
-# curl 172.17.0.1:8500/v1/status/leader  #get the leader
-# consul cmd cmd cmd --help has wonderful examples, thank me later
-# curl --request GET http://127.0.0.1:8500/v1/agent/checks
 
 cmd=${1:-''}
 
 case $cmd in
 sync-confs) sync_local_configs ;;
-sync-auto-env) sync_env_auto ;;
+sync-env-auto) sync_env_auto ;;
 reload) consul reload ;;
 validate)
   what=${2:-'hcl'}
@@ -340,15 +347,12 @@ get)
   token-info) consul acl token read -id ${3:?'token axor id required: use `list tokens`'} ;;
   root-token)
     if test -f $JAIL_TOKEN_ROOT; then
-      get_token $JAIL_TOKEN_ROOT
+      get_token_from_file $JAIL_TOKEN_ROOT
     fi
     ;;
-  dns-token) get_token $JAIL_TOKEN_POLICY_DNS ;;
-  server-token) get_token $JAIL_TOKEN_POLICY_SERVER ;;
-  service-token)
-    svc_name=${3:?'svc_name required'}
-    get_token ${JAIL_MESH_TOKENS}/token.${svc_name}.json
-    ;;
+  dns-token) get_token_from_file $JAIL_TOKEN_POLICY_DNS ;;
+  server-token) get_token_from_file $JAIL_TOKEN_POLICY_SERVER ;;
+  token) get_token_from_file $3 ;;
   *) invalid_request ;;
   esac
   ;;
