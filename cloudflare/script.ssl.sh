@@ -252,6 +252,19 @@ create_cli_cert() {
   chmod_cert_files
 }
 
+create_p12_cert() {
+  local cert_name=${1:-client-0}
+  local use_ca_cn=${2:-$CA_CN}
+  local this_jail_tls_dir="${JAIL}/${use_ca_cn}/tls"
+
+  local client_pub="${this_jail_tls_dir}/${cert_name}.pem"
+  local client_prv="${this_jail_tls_dir}/${cert_name}-key.pem"
+
+  throw_missing_file $client_pub 400 "no pubkey exists for $cert_name"
+  throw_missing_file $client_prv 400 "no privkey exists for $cert_name"
+  openssl pkcs12 -export -in $client_pub -inkey $client_prv -out client-0.p12
+}
+
 ######################## PROGRAM
 cmd=${1:-''}
 
@@ -327,6 +340,7 @@ create)
       $use_cli_name \
       $use_cfssl_config
     ;;
+  p12) create_p12_cert ${3:-''} ${4:-''} ;;
   *) invalid_request ;;
   esac
   ;;
