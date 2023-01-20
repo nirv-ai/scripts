@@ -278,7 +278,7 @@ sync_env_auto() {
     sed -i '/^CONSUL_HTTP_TOKEN/d;/CONSUL_DNS_TOKEN/d;/CONSUL_NODE_PREFIX/d' $env_auto_path
     # add new lines
     sed -i "\$aCONSUL_DNS_TOKEN=$(get_token_from_file $JAIL_TOKEN_POLICY_DNS)" $env_auto_path
-    sed -i "\$aCONSUL_HTTP_TOKEN=$(get_token_from_file $JAIL_TOKEN_ROOT)" $env_auto_path
+    sed -i "\$aCONSUL_HTTP_TOKEN=$(get_token_from_file $JAIL_TOKEN_POLICY_SERVER)" $env_auto_path
     sed -i "\$aCONSUL_NODE_PREFIX=$CONSUL_SERVER_NODE_PREFIX" $env_auto_path
   fi
 
