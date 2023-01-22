@@ -15,16 +15,17 @@ done
 
 ######################## INTERFACE
 # grouped by increasing order of dependency
+APP_IAC_NOMAD_DIR="${APP_IAC_NOMAD_DIR:-${APP_IAC_PATH}/nomad}"
+export NOMAD_CACERT="${NOMAD_CACERT:-${CERTS_DIR_HOST}/${MAD_HOSTNAME}/ca.pem}"
+export NOMAD_CLIENT_CERT="${NOMAD_CLIENT_CERT:-${CERTS_DIR_HOST}/${MAD_HOSTNAME}/cli-0.pem}"
+export NOMAD_CLIENT_KEY="${NOMAD_CLIENT_KEY:-${CERTS_DIR_HOST}/${MAD_HOSTNAME}/cli-0-key.pem}"
+NOMAD_CONF_CLIENT="${CONFIGS_DIR}/nomad/client"
+NOMAD_CONF_GLOBALS="${CONFIGS_DIR}/nomad/global"
+NOMAD_CONF_SERVER="${CONFIGS_DIR}/nomad/server"
+NOMAD_CONF_STACKS="${CONFIGS_DIR}/nomad/stacks"
 NOMAD_SERVER_PORT="${NOMAD_SERVER_PORT:-4646}"
-NOMAD_CACERT="${NOMAD_CACERT:-${CERTS_DIR_HOST}/${MAD_HOSTNAME}/ca.pem}"
-NOMAD_CLIENT_CERT="${NOMAD_CLIENT_CERT:-${CERTS_DIR_HOST}/${MAD_HOSTNAME}/cli-0.pem}"
-NOMAD_CLIENT_KEY="${NOMAD_CLIENT_KEY:-${CERTS_DIR_HOST}/${MAD_HOSTNAME}/cli-0-key.pem}"
 
-NOMAD_ADDR="${NOMAD_ADDR:-https://${MAD_HOSTNAME}:${NOMAD_SERVER_PORT}}"
-
-# this is silly, we should just rely on the env vars being correct
-# then the cmds should pick them up automatically
-NOMAD_CMD_ARGS="-ca-cert=$NOMAD_CACERT -client-cert=$NOMAD_CLIENT_CERT -client-key=$NOMAD_CLIENT_KEY -address=$NOMAD_ADDR"
+export NOMAD_ADDR="${NOMAD_ADDR:-https://${MAD_HOSTNAME}:${NOMAD_SERVER_PORT}}"
 
 # add vars that should be printed when NIRV_SCRIPT_DEBUG=1
 declare -A EFFECTIVE_INTERFACE=(
@@ -34,6 +35,10 @@ declare -A EFFECTIVE_INTERFACE=(
   [NOMAD_CACERT]=$NOMAD_CACERT
   [NOMAD_CLIENT_CERT]=$NOMAD_CLIENT_CERT
   [NOMAD_CLIENT_KEY]=$NOMAD_CLIENT_KEY
+  [NOMAD_CONF_CLIENT]=$NOMAD_CONF_CLIENT
+  [NOMAD_CONF_GLOBALS]=$NOMAD_CONF_GLOBALS
+  [NOMAD_CONF_SERVER]=$NOMAD_CONF_SERVER
+  [NOMAD_CONF_STACKS]=$NOMAD_CONF_STACKS
   [SCRIPTS_DIR_PARENT]=$SCRIPTS_DIR_PARENT
 )
 
@@ -48,65 +53,52 @@ throw_missing_file $NOMAD_CLIENT_CERT 400 "all cmds require cli pem"
 throw_missing_file $NOMAD_CLIENT_KEY 400 "all cmds require cli key pem"
 
 ######################## FNS
-nmd() {
-  if test "$*" = "${*#job init}"; then
-    for arg in $@; do
-      if [[ $arg = -config* || $arg = *.nomad ]]; then
-        fpath="$APP_IAC_PATH/${arg#*=}"
-        echo -e "formatting file: $fpath"
-        nomad fmt -check "$fpath"
-        if [[ $arg = -config* ]]; then
-          echo -e "validating file: $fpath"
-          nomad config validate "$fpath"
-        fi
-      fi
-    done
-  fi
+sync_local_configs() {
+  use_hashi_fmt || true
 
-  case $1 in
-  s | c) # s = server, c = client
-    what=$(test "$1" = 'c' && echo 'client' || echo 'server')
-    request_sudo 'starting nomad agent'
-    echo -e "starting $what: sudo -b nomad agent ${@:2}"
-    sudo -b nomad agent "${@:2}"
-    ;;
-  plan | status)
-    echo
-    echo -e "executing: sudo nomad $1 [tls-options] ${@:2}"
-    sudo nomad "$1" $NOMAD_CMD_ARGS "${@:2}"
-    ;;
-  job | node | alloc | system)
-    case $2 in
-    run | status | logs | run | stop | gc)
-      echo -e "executing: sudo nomad $1 $2 [tls-options] ${@:3}"
-      echo
-      sudo nomad "$1" "$2" $NOMAD_CMD_ARGS "${@:3}"
-      ;;
-    *) echo -e "cmd not setup for script.nmd.sh: $@ " ;;
-    esac
-    ;;
-  *)
-    # catch all: nomad expects TNOMAD_CMD_ARGS to come after nomad CMD ...
-    echo -e "executing: sudo nomad $@ [tls-options]"
-    sudo nomad "$@" $NOMAD_CMD_ARGS
-    ;;
-  esac
+  local client_configs=(
+    $NOMAD_CONF_CLIENT
+    $NOMAD_CONF_GLOBALS
+  )
+
+  local server_configs=(
+    $NOMAD_CONF_GLOBALS
+    $NOMAD_CONF_SERVER
+  )
+
+  echo_debug 'syncing nomad server confs'
+  local iac_server_dir="${APP_IAC_NOMAD_DIR}/server"
+  mkdir -p $iac_server_dir
+  for server_conf in "${server_configs[@]}"; do
+    cp_to_dir $server_conf $iac_server_dir
+  done
+
+  echo_debug 'syncing nomad server confs'
+  local iac_client_dir="${APP_IAC_NOMAD_DIR}/client"
+  mkdir -p $iac_client_dir
+  for client_conf in "${client_configs[@]}"; do
+    cp_to_dir $client_conf $iac_client_dir
+  done
 }
 
 ######################## EXECUTE
 cmd=${1:-''}
 case $cmd in
+sync-confs) sync_local_configs ;;
+kill-nomad) kill_service_by_name nomad ;;
 gc)
   nmd system gc
   ;;
 start)
-  what=${2:-""}
-  case $what in
-  s | c) nmd "${@:2}" ;;
-  *)
-    echo -e 'syntax: start [server|client] -config=x -config=y ....'
-    exit 0
+  type=${2:-''}
+  case $type in
+  server | client)
+    conf_dir="$APP_IAC_NOMAD_DIR/$type"
+    throw_missing_dir $conf_dir 400 "$conf_dir doesnt exist"
+    request_sudo "starting nomad $type agent"
+    sudo -b nomad agent -config=$conf_dir
     ;;
+  *) invalid_request ;;
   esac
   ;;
 create)
