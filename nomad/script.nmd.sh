@@ -53,19 +53,6 @@ throw_missing_file $NOMAD_CLIENT_CERT 400 "all cmds require cli pem"
 throw_missing_file $NOMAD_CLIENT_KEY 400 "all cmds require cli key pem"
 
 ######################## FNS
-nmd() {
-  case $1 in
-  s | c) # s = server, c = client
-    what=$(test "$1" = 'c' && echo 'client' || echo 'server')
-    request_sudo 'starting nomad agent'
-    echo -e "starting $what: sudo -b nomad agent ${@:2}"
-    sudo -b nomad agent "${@:2}"
-    ;;
-  *)
-    sudo nomad $@
-    ;;
-  esac
-}
 sync_local_configs() {
   use_hashi_fmt || true
 
@@ -93,21 +80,25 @@ sync_local_configs() {
     cp_to_dir $client_conf $iac_client_dir
   done
 }
+
 ######################## EXECUTE
 cmd=${1:-''}
 case $cmd in
 sync-confs) sync_local_configs ;;
+kill-nomad) kill_service_by_name nomad ;;
 gc)
   nmd system gc
   ;;
 start)
-  what=${2:-""}
-  case $what in
-  s | c) nmd "${@:2}" ;;
-  *)
-    echo -e 'syntax: start [server|client] -config=x -config=y ....'
-    exit 0
+  type=${2:-''}
+  case $type in
+  server | client)
+    conf_dir="$APP_IAC_NOMAD_DIR/$type"
+    throw_missing_dir $conf_dir 400 "$conf_dir doesnt exist"
+    request_sudo "starting nomad $type agent"
+    sudo -b nomad agent -config=$conf_dir
     ;;
+  *) invalid_request ;;
   esac
   ;;
 create)
