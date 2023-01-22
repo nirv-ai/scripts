@@ -1,35 +1,63 @@
 #!/usr/bin/env bash
 
-set -eu
+set -euo pipefail
 
-NOMAD_ADDR_SUBD=${ENV:-mad}
-NOMAD_ADDR_HOST=${NOMAD_ADDR_HOST:-nirv.ai}
+######################## SETUP
+DOCS_URI='https://github.com/nirv-ai/docs/blob/main/your-script-dir/README.md'
+SCRIPTS_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]%/}")" &>/dev/null && pwd)"
+
+SCRIPTS_DIR_PARENT="$(dirname $SCRIPTS_DIR)"
+
+# PLATFORM UTILS
+for util in $SCRIPTS_DIR/utils/*.sh; do
+  source $util
+done
+
+######################## INTERFACE
+# grouped by increasing order of dependency
 NOMAD_SERVER_PORT="${NOMAD_SERVER_PORT:-4646}"
-NOMAD_ADDR="${NOMAD_ADDR:-https://${NOMAD_ADDR_SUBD}.${NOMAD_ADDR_HOST}:${NOMAD_SERVER_PORT}}"
-NOMAD_CACERT="${NOMAD_CACERT:-./tls/nomad-ca.pem}"
-NOMAD_CLIENT_CERT="${NOMAD_CLIENT_CERT:-./tls/cli.pem}"
-NOMAD_CLIENT_KEY="${NOMAD_CLIENT_KEY:-./tls/cli-key.pem}"
+NOMAD_CACERT="${NOMAD_CACERT:-${CERTS_DIR_HOST}/${MAD_HOSTNAME}/ca.pem}"
+NOMAD_CLIENT_CERT="${NOMAD_CLIENT_CERT:-${CERTS_DIR_HOST}/${MAD_HOSTNAME}/cli-0.pem}"
+NOMAD_CLIENT_KEY="${NOMAD_CLIENT_KEY:-${CERTS_DIR_HOST}/${MAD_HOSTNAME}/cli-0-key.pem}"
 
+NOMAD_ADDR="${NOMAD_ADDR:-https://${MAD_HOSTNAME}:${NOMAD_SERVER_PORT}}"
+
+# this is silly, we should just rely on the env vars being correct
+# then the cmds should pick them up automatically
 NOMAD_CMD_ARGS="-ca-cert=$NOMAD_CACERT -client-cert=$NOMAD_CLIENT_CERT -client-key=$NOMAD_CLIENT_KEY -address=$NOMAD_ADDR"
 
-DEBUG=${NIRV_SCRIPT_DEBUG:-''}
+# add vars that should be printed when NIRV_SCRIPT_DEBUG=1
+declare -A EFFECTIVE_INTERFACE=(
+  [APP_IAC_PATH]=$APP_IAC_PATH
+  [DOCS_URI]=$DOCS_URI
+  [NOMAD_ADDR]=$NOMAD_ADDR
+  [NOMAD_CACERT]=$NOMAD_CACERT
+  [NOMAD_CLIENT_CERT]=$NOMAD_CLIENT_CERT
+  [NOMAD_CLIENT_KEY]=$NOMAD_CLIENT_KEY
+  [SCRIPTS_DIR_PARENT]=$SCRIPTS_DIR_PARENT
+)
 
+######################## CREDIT CHECK
+echo_debug_interface
+
+# add aditional checks and balances below this line
+# use standard http response codes
+throw_missing_dir $SCRIPTS_DIR_PARENT 500 "somethings wrong: cant find myself in filesystem"
+throw_missing_file $NOMAD_CACERT 400 "all cmds require cert auth pem"
+throw_missing_file $NOMAD_CLIENT_CERT 400 "all cmds require cli pem"
+throw_missing_file $NOMAD_CLIENT_KEY 400 "all cmds require cli key pem"
+
+######################## FNS
 nmd() {
-  if [ "$DEBUG" = 1 ]; then
-    echo -e '\n\n[DEBUG] SCRIPT.NMD.SH\n------------'
-    echo -e "[cmd]: $1\n[args]: ${@:2}\n------------\n\n"
-  fi
-
-  # dont process job init commands, as theres no config to validate/check
   if test "$*" = "${*#job init}"; then
     for arg in $@; do
       if [[ $arg = -config* || $arg = *.nomad ]]; then
-        path=${arg#*=}
-        echo -e "formatting file: $path"
-        nomad fmt -check "$path"
+        fpath="$APP_IAC_PATH/${arg#*=}"
+        echo -e "formatting file: $fpath"
+        nomad fmt -check "$fpath"
         if [[ $arg = -config* ]]; then
-          echo -e "validating file: $path"
-          nomad config validate "$path"
+          echo -e "validating file: $fpath"
+          nomad config validate "$fpath"
         fi
       fi
     done
@@ -38,6 +66,7 @@ nmd() {
   case $1 in
   s | c) # s = server, c = client
     what=$(test "$1" = 'c' && echo 'client' || echo 'server')
+    request_sudo 'starting nomad agent'
     echo -e "starting $what: sudo -b nomad agent ${@:2}"
     sudo -b nomad agent "${@:2}"
     ;;
@@ -64,11 +93,9 @@ nmd() {
   esac
 }
 
-ENV=${ENV:-development}
-nmdhelp='get|create|start|run|stop|rm|dockerlogs'
-nmdcmd=${1:-help}
-
-case $nmdcmd in
+######################## EXECUTE
+cmd=${1:-''}
+case $cmd in
 gc)
   nmd system gc
   ;;
@@ -252,5 +279,5 @@ dockerlogs)
   done
   tail -f /tmp/*.{log,err}
   ;;
-*) echo -e $nmdhelp ;;
+*) invalid_request ;;
 esac
