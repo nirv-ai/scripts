@@ -3,7 +3,7 @@
 set -euo pipefail
 
 ######################## SETUP
-DOCS_URI='https://github.com/nirv-ai/docs/blob/main/your-script-dir/README.md'
+DOCS_URI='https://github.com/nirv-ai/docs/blob/main/nomad/README.md'
 SCRIPTS_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]%/}")" &>/dev/null && pwd)"
 
 SCRIPTS_DIR_PARENT="$(dirname $SCRIPTS_DIR)"
@@ -19,18 +19,23 @@ APP_IAC_NOMAD_DIR="${APP_IAC_NOMAD_DIR:-${APP_IAC_PATH}/nomad}"
 export NOMAD_CACERT="${NOMAD_CACERT:-${CERTS_DIR_HOST}/${MAD_HOSTNAME}/ca.pem}"
 export NOMAD_CLIENT_CERT="${NOMAD_CLIENT_CERT:-${CERTS_DIR_HOST}/${MAD_HOSTNAME}/cli-0.pem}"
 export NOMAD_CLIENT_KEY="${NOMAD_CLIENT_KEY:-${CERTS_DIR_HOST}/${MAD_HOSTNAME}/cli-0-key.pem}"
+JAIL_MAD_KEYS="${JAIL}/nomad/keys"
+JAIL_MAD_TOKENS="${JAIL}/nomad/tokens"
 NOMAD_CONF_CLIENT="${CONFIGS_DIR}/nomad/client"
 NOMAD_CONF_GLOBALS="${CONFIGS_DIR}/nomad/global"
 NOMAD_CONF_SERVER="${CONFIGS_DIR}/nomad/server"
 NOMAD_CONF_STACKS="${CONFIGS_DIR}/nomad/stacks"
+NOMAD_GOSSIP_FILENAME='server.gossip.key'
 NOMAD_SERVER_PORT="${NOMAD_SERVER_PORT:-4646}"
 
 export NOMAD_ADDR="${NOMAD_ADDR:-https://${MAD_HOSTNAME}:${NOMAD_SERVER_PORT}}"
+JAIL_KEY_GOSSIP="${JAIL_MAD_KEYS}/${NOMAD_GOSSIP_FILENAME}"
 
 # add vars that should be printed when NIRV_SCRIPT_DEBUG=1
 declare -A EFFECTIVE_INTERFACE=(
   [APP_IAC_PATH]=$APP_IAC_PATH
   [DOCS_URI]=$DOCS_URI
+  [JAIL_KEY_GOSSIP]=$JAIL_KEY_GOSSIP
   [NOMAD_ADDR]=$NOMAD_ADDR
   [NOMAD_CACERT]=$NOMAD_CACERT
   [NOMAD_CLIENT_CERT]=$NOMAD_CLIENT_CERT
@@ -80,7 +85,11 @@ sync_local_configs() {
     cp_to_dir $client_conf $iac_client_dir
   done
 }
-
+create_gossip_key() {
+  echo_debug 'creating gossip key'
+  mkdir -p $JAIL_MAD_KEYS
+  nomad operator gossip keyring generate >$JAIL_KEY_GOSSIP
+}
 ######################## EXECUTE
 cmd=${1:-''}
 case $cmd in
@@ -95,18 +104,28 @@ gc)
   ;;
 start)
   type=${2:-''}
+  name=${3:?agent name required}
+  conf_dir="$APP_IAC_NOMAD_DIR/$type"
+  throw_missing_dir $conf_dir 400 "$conf_dir doesnt exist"
+
+  # TODO: we need to add -dev-connect
   case $type in
-  server | client)
-    name=${3:?agent name required}
-    conf_dir="$APP_IAC_NOMAD_DIR/$type"
-    throw_missing_dir $conf_dir 400 "$conf_dir doesnt exist"
+  server)
     request_sudo "starting nomad $type agent $name"
-    # TODO: we need to add -dev-connect
     sudo -b nomad agent \
       -config=$conf_dir \
       -data-dir=/tmp/$name \
+      -encrypt=$(cat $JAIL_KEY_GOSSIP) \
       -node=$type-$name.$(hostname) \
-      -plugin-dir=/opt/cni
+      -server
+    ;;
+  client)
+    request_sudo "starting nomad $type agent $name"
+    sudo -b nomad agent \
+      -client \
+      -config=$conf_dir \
+      -data-dir=/tmp/$name \
+      -node=$type-$name.$(hostname)
     ;;
   *) invalid_request ;;
   esac
@@ -114,11 +133,7 @@ start)
 create)
   what=${2:-""}
   case $what in
-  gossipkey)
-    echo -e 'creating gossip encryption key'
-    echo -e 'remember to update your job.nomad server block'
-    nomad operator gossip keyring generate
-    ;;
+  gossipkey) create_gossip_key ;;
   job)
     name=${3:-""}
     if [[ -z $name ]]; then
