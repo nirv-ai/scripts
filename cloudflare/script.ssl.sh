@@ -165,7 +165,6 @@ create_server_cert() {
 
   chmod_cert_files
 }
-
 create_client_cert() {
   local total=${1:-1}
   local use_ca_cn=${2:-$CA_CN}
@@ -208,7 +207,6 @@ create_client_cert() {
 
   chmod_cert_files
 }
-
 create_cli_cert() {
   local total=${1:-1}
   local use_ca_cn=${2:-$CA_CN}
@@ -251,7 +249,6 @@ create_cli_cert() {
 
   chmod_cert_files
 }
-
 create_p12_cert() {
   local cert_name=${1:-client-0}
   local use_ca_cn=${2:-$CA_CN}
@@ -262,7 +259,7 @@ create_p12_cert() {
 
   throw_missing_file $client_pub 400 "no pubkey exists for $cert_name"
   throw_missing_file $client_prv 400 "no privkey exists for $cert_name"
-  openssl pkcs12 -export -in $client_pub -inkey $client_prv -out client-0.p12
+  openssl pkcs12 -export -in $client_pub -inkey $client_prv -out $this_jail_tls_dir/$cert_name.p12
 }
 
 ######################## PROGRAM
