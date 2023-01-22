@@ -87,7 +87,7 @@ case $cmd in
 sync-confs) sync_local_configs ;;
 kill-nomad) kill_service_by_name nomad ;;
 gc)
-  nmd system gc
+  nomad system gc
   ;;
 start)
   type=${2:-''}
@@ -107,7 +107,7 @@ create)
   gossipkey)
     echo -e 'creating gossip encryption key'
     echo -e 'remember to update your job.nomad server block'
-    nmd operator gossip keyring generate
+    nomad operator gossip keyring generate
     ;;
   job)
     name=${3:-""}
@@ -134,7 +134,7 @@ get)
 
   case $2 in
   status)
-    opts='team|node|all|loc|dep|job'
+    opts='servers|clients|all'
     cmdhelp="get status of what? $opts"
     ofwhat=${3:-""}
     if [[ -z $ofwhat ]]; then
@@ -144,20 +144,20 @@ get)
     case $3 in
     servers)
       echo -e "retrieving server(s) status"
-      nmd server members -detailed
+      nomad server members -detailed
       ;;
     clients)
       nodeid=${4:-''}
       if [[ -z $nodeid ]]; then
         echo -e 'retrieving client(s) status'
-        nmd node status -verbose
+        nomad node status -verbose
         exit 0
       fi
       # $nodeid can be -self
       echo -e "retrieving status for client $nodeid"
-      nmd node status -verbose $nodeid
+      nomad node status -verbose $nodeid
       ;;
-    all) nmd status ;;
+    all) nomad status ;;
     loc)
       id=${4:-""}
       if [[ -z $id ]]; then
@@ -165,7 +165,7 @@ get)
         exit 1
       fi
       echo -e "getting status of allocation: $id"
-      nmd alloc status -verbose -stats $id
+      nomad alloc status -verbose -stats $id
       ;;
     dep)
       id=${4:-""}
@@ -174,7 +174,7 @@ get)
         exit 1
       fi
       echo -e "getting status of deployment: $id"
-      nmd status $id
+      nomad status $id
       ;;
     job)
       name=${4:-""}
@@ -183,7 +183,7 @@ get)
         exit 1
       fi
       echo -e "getting status of $name"
-      nmd job status $name
+      nomad job status $name
       ;;
     *) echo -e $cmdhelp ;;
     esac
@@ -196,7 +196,7 @@ get)
       exit 1
     fi
     echo -e "fetching logs for task $name in allocation $id"
-    nmd alloc logs -f $id $name
+    nomad alloc logs -f $id $name
     ;;
   plan)
     name=${3:-""}
@@ -213,7 +213,7 @@ get)
     echo -e "creating job plan for $name"
     echo -e "\tto use this script to submit the job"
     echo -e "\texecute: run $name indexNumber"
-    nmd plan -var-file=.env.$ENV.compose.json "$ENV.$name.nomad"
+    nomad plan -var-file=.env.$ENV.compose.json "$ENV.$name.nomad"
     ;;
   *) echo -e $gethelp ;;
   esac
@@ -235,14 +235,14 @@ run)
     echo -e 'get the job index: `get plan jobName`'
     echo -e 'syntax: `run jobName [jobIndex]`'
     echo -e "running job $name anyway :("
-    nmd job run -var-file=.env.$ENV.compose.json $ENV.$name.nomad
+    nomad job run -var-file=.env.$ENV.compose.json $ENV.$name.nomad
     exit $?
   fi
   echo -e "running job $name at index $index"
   echo -e '\t job failures? get the allocation id from the job status'
   echo -e '\t execute: get status job jobName'
   echo -e '\t execute: get status loc allocId\n\n'
-  nmd job run -check-index $index -var-file=.env.$ENV.compose.json $ENV.$name.nomad
+  nomad job run -check-index $index -var-file=.env.$ENV.compose.json $ENV.$name.nomad
   ;;
 rm)
   name=${2:-""}
@@ -251,7 +251,7 @@ rm)
     exit 1
   fi
   echo -e "purging job $name"
-  nmd job stop -purge $name
+  nomad job stop -purge $name
   ;;
 stop)
   name=${2:-""}
@@ -260,7 +260,7 @@ stop)
     exit 1
   fi
   echo -e "stopping job $name"
-  nmd job stop $name
+  nomad job stop $name
   ;;
 dockerlogs)
   # @see https://stackoverflow.com/questions/36756751/view-logs-for-all-docker-containers-simultaneously
