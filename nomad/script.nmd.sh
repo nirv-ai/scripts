@@ -85,7 +85,11 @@ sync_local_configs() {
 cmd=${1:-''}
 case $cmd in
 sync-confs) sync_local_configs ;;
-kill-nomad) kill_service_by_name nomad ;;
+kill)
+  # requires shell-init/services.sh
+  request_sudo 'kill service with name nomad'
+  kill_service_by_name nomad || true
+  ;;
 gc)
   nomad system gc
   ;;
@@ -93,10 +97,16 @@ start)
   type=${2:-''}
   case $type in
   server | client)
+    name=${3:?agent name required}
     conf_dir="$APP_IAC_NOMAD_DIR/$type"
     throw_missing_dir $conf_dir 400 "$conf_dir doesnt exist"
-    request_sudo "starting nomad $type agent"
-    sudo -b nomad agent -config=$conf_dir
+    request_sudo "starting nomad $type agent $name"
+    # TODO: we need to add -dev-connect
+    sudo -b nomad agent \
+      -config=$conf_dir \
+      -data-dir=/tmp/$name \
+      -node=$type-$name.$(hostname) \
+      -plugin-dir=/opt/cni
     ;;
   *) invalid_request ;;
   esac
