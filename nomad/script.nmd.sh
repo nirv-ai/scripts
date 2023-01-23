@@ -125,9 +125,26 @@ get_stack_plan() {
   throw_missing_file $env_file 404 'env file doesnt exist'
 
   echo_debug "creating job plan for $name"
-  echo_debug "to use this script to submit the job"
-  echo_debug "execute: run $name indexNumber"
+  echo "to use this script to submit the job"
+  echo "execute: run $name indexNumber"
   nomad plan -var-file=$env_file "$stack_file"
+}
+run_stack() {
+  name=${1:?stack name required}
+  index=${2:?index required}
+
+  # TODO: this should be APP_IAC_PATH when working
+  stack_file="${NOMAD_CONF_STACKS}/${name}.nomad"
+  env_file="${SCRIPTS_DIR_PARENT}/$name/.env.compose.json"
+
+  throw_missing_file $stack_file 404 'stack file doesnt exist'
+  throw_missing_file $env_file 404 'env file doesnt exist'
+
+  echo_debug "running stack $name at index $index"
+  echo -e '\t job failures? get the allocation id from the job status'
+  echo -e '\t execute: get status job jobName'
+  echo -e '\t execute: get status loc allocId\n\n'
+  nomad job run -check-index $index -var-file=$env_file "$stack_file"
 }
 ######################## EXECUTE
 cmd=${1:-''}
@@ -238,32 +255,7 @@ get)
   *) invalid_request ;;
   esac
   ;;
-run)
-  name=${2:-""}
-  index=${3:-""}
-  if [[ -z $name ]]; then
-    echo -e 'syntax: `run jobName [jobIndex]`'
-    exit 1
-  fi
-  if test ! -f "$ENV.$name.nomad"; then
-    echo -e "ensure jobspec $ENV.$name.nomad exists in current dir"
-    echo -e 'create a new job with `create job jobName`'
-    exit 1
-  fi
-  if [[ -z $index ]]; then
-    echo -e 'you should always use the jobIndex'
-    echo -e 'get the job index: `get plan jobName`'
-    echo -e 'syntax: `run jobName [jobIndex]`'
-    echo -e "running job $name anyway :("
-    nomad job run -var-file=.env.$ENV.compose.json $ENV.$name.nomad
-    exit $?
-  fi
-  echo -e "running job $name at index $index"
-  echo -e '\t job failures? get the allocation id from the job status'
-  echo -e '\t execute: get status job jobName'
-  echo -e '\t execute: get status loc allocId\n\n'
-  nomad job run -check-index $index -var-file=.env.$ENV.compose.json $ENV.$name.nomad
-  ;;
+run) run_stack ${2:?stack name required} ${3:?job index required} ;;
 rm)
   name=${2:-""}
   if [[ -z $name ]]; then
