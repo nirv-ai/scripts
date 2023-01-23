@@ -6,14 +6,12 @@ dk_ps() {
   docker ps --no-trunc -a --format 'table {{.Names}}\n\t{{.Image}}\n\t{{.Status}}\n\t{{.Command}}\n\n' | tac
 }
 
-ENV=${ENV:-development}
-
 save_canonical_compose_config() {
   dk_ps
 
-  echo -e "\nforcing .env.${ENV}.compose.[yaml, json] in current dir"
-  docker compose convert | yq -r -o=json >.env.${ENV}.compose.json
-  docker compose convert >.env.${ENV}.compose.yaml
+  echo -e "\nforcing .env.compose.[yaml, json] in current dir"
+  docker compose convert | yq -r -o=json >.env.compose.json
+  docker compose convert >.env.compose.yaml
 }
 service_restart_all() {
   echo -e "restarting all containers"

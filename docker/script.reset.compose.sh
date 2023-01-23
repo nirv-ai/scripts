@@ -2,8 +2,6 @@
 
 set -euo pipefail
 
-ENV=${ENV:-development}
-
 dk_ps() {
   docker ps --no-trunc -a --format 'table {{.Names}}\n\t{{.Image}}\n\t{{.Status}}\n\t{{.Command}}\n\n' | tac
 }
@@ -25,15 +23,12 @@ up() {
 
   dk_ps
 
-  echo -e "forcing .env.${ENV}.compose.[yaml, json] in current dir"
-  docker compose convert | yq -r -o=json >.env.${ENV}.compose.json
-  docker compose convert >.env.${ENV}.compose.yaml
+  echo -e "forcing .env.compose.[yaml, json] in current dir"
+  docker compose convert | yq -r -o=json >.env.compose.json
+  docker compose convert >.env.compose.yaml
 
   docker compose up $up_flags
 }
-
-# redundant: the env file is persisted to disk
-# docker compose config
 
 cmd=${1:-'all'}
 case $cmd in

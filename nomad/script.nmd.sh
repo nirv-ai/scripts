@@ -58,6 +58,11 @@ throw_missing_file $NOMAD_CLIENT_CERT 400 "all cmds require cli pem"
 throw_missing_file $NOMAD_CLIENT_KEY 400 "all cmds require cli key pem"
 
 ######################## FNS
+kill_nomad_service() {
+  # requires shell-init/services.sh
+  request_sudo 'kill service with name nomad'
+  kill_service_by_name nomad || true
+}
 sync_local_configs() {
   use_hashi_fmt || true
 
@@ -84,48 +89,106 @@ sync_local_configs() {
   for client_conf in "${client_configs[@]}"; do
     cp_to_dir $client_conf $iac_client_dir
   done
+
+  echo_debug 'copying nomad stacks'
+  local iac_stacks_dir="${APP_IAC_NOMAD_DIR}/stacks"
+  mkdir -p $iac_stacks_dir
+  cp_to_dir $NOMAD_CONF_STACKS $iac_stacks_dir
 }
 create_gossip_key() {
   echo_debug 'creating gossip key'
   mkdir -p $JAIL_MAD_KEYS
   nomad operator gossip keyring generate >$JAIL_KEY_GOSSIP
 }
+create_new_stack() {
+  name=${1:?stack name required}
+
+  echo_debug "creating new stack $name.nomad"
+  nomad job init -short "$name.nomad"
+
+  echo_debug "updating stack name in $name.nomad"
+  sed -i "/job \"example\"/c\job \"$name\" {" "$name.nomad"
+
+  echo_debug "moving stack $name.nomad to configs"
+  mv $name.nomad $NOMAD_CONF_STACKS/$name.nomad
+
+  echo_debug "syncing nomad configs"
+  sync_local_configs
+}
+get_stack_plan() {
+  name=${1:?stack name required}
+  # TODO: this should be APP_IAC_PATH when working
+  stack_file="${NOMAD_CONF_STACKS}/${name}.nomad"
+  env_file="${SCRIPTS_DIR_PARENT}/$name/.env.compose.json"
+
+  throw_missing_file $stack_file 404 'stack file doesnt exist'
+  throw_missing_file $env_file 404 'env file doesnt exist'
+
+  echo_debug "creating job plan for $name"
+  echo_info "execute this plan: run $name indexNumber"
+  nomad plan -var-file=$env_file "$stack_file"
+}
+run_stack() {
+  name=${1:?stack name required}
+  index=${2:?index required}
+
+  # TODO: this should be APP_IAC_PATH when working
+  stack_file="${NOMAD_CONF_STACKS}/${name}.nomad"
+  env_file="${SCRIPTS_DIR_PARENT}/$name/.env.compose.json"
+
+  throw_missing_file $stack_file 404 'stack file doesnt exist'
+  throw_missing_file $env_file 404 'env file doesnt exist'
+
+  echo_debug "running stack $name at index $index"
+  echo_debug '\t job failures? get the allocation id from the job status'
+  echo_debug '\t execute: get status job jobName'
+  echo_debug '\t execute: get status loc allocId\n\n'
+  nomad job run -check-index $index -var-file=$env_file "$stack_file"
+}
 ######################## EXECUTE
+
 cmd=${1:-''}
 case $cmd in
 sync-confs) sync_local_configs ;;
-kill)
-  # requires shell-init/services.sh
-  request_sudo 'kill service with name nomad'
-  kill_service_by_name nomad || true
-  ;;
+kill) kill_nomad_service ;;
 gc)
   nomad system gc
   ;;
 start)
   type=${2:-''}
-  name=${3:?agent name required}
+  total=1 #${3:-1}
   conf_dir="$APP_IAC_NOMAD_DIR/$type"
   throw_missing_dir $conf_dir 400 "$conf_dir doesnt exist"
 
   # TODO: we need to add -dev-connect
   case $type in
   server)
-    request_sudo "starting nomad $type agent $name"
-    sudo -b nomad agent \
-      -config=$conf_dir \
-      -data-dir=/tmp/$name \
-      -encrypt=$(cat $JAIL_KEY_GOSSIP) \
-      -node=$type-$name.$(hostname) \
-      -server
+    request_sudo "starting $total nomad $type agent(s)"
+    declare -i i=0
+    while [ $i -lt $total ]; do
+      name=s$i
+      sudo -b nomad agent \
+        -bootstrap-expect=$total \
+        -config=$conf_dir \
+        -data-dir=/tmp/nomad/$name \
+        -encrypt=$(cat $JAIL_KEY_GOSSIP) \
+        -node=$type-$name.$(hostname) \
+        -server
+      i=$((i + 1))
+    done
     ;;
   client)
-    request_sudo "starting nomad $type agent $name"
-    sudo -b nomad agent \
-      -client \
-      -config=$conf_dir \
-      -data-dir=/tmp/$name \
-      -node=$type-$name.$(hostname)
+    request_sudo "starting $total nomad $type agent(s)"
+    declare -i i=0
+    while [ $i -lt $total ]; do
+      name=c$i
+      sudo -b nomad agent \
+        -client \
+        -config=$conf_dir \
+        -data-dir=/tmp/nomad/$name \
+        -node=$type-$name.$(hostname)
+      i=$((i + 1))
+    done
     ;;
   *) invalid_request ;;
   esac
@@ -134,83 +197,48 @@ create)
   what=${2:-""}
   case $what in
   gossipkey) create_gossip_key ;;
-  job)
-    name=${3:-""}
-    if [[ -z $name ]]; then
-      echo 'syntax: `create job jobName`'
-      exit 1
-    fi
-
-    echo -e "creating new job $3.nomad in the current dir"
-    nomad job init -short "$ENV.$name.nomad"
-    echo -e "updating job name in $ENV.$name.nomad"
-    sudo sed -i "/job \"example\"/c\job \"$name\" {" "./$ENV.$name.nomad"
-    ;;
-  *) echo -e "syntax: create job|gossipkey." ;;
+  stack) create_new_stack ${3:?stack name required} ;;
+  *) invalid_request ;;
   esac
   ;;
 get)
-  gethelp='get status|logs|plan'
-  cmdname=${2:-""}
-  if [[ -z $cmdname ]]; then
-    echo -e $gethelp
-    exit 1
-  fi
-
+  cmdname=${2:-''}
   case $2 in
   status)
-    opts='servers|clients|all'
-    cmdhelp="get status of what? $opts"
-    ofwhat=${3:-""}
-    if [[ -z $ofwhat ]]; then
-      echo -e $cmdhelp
-      exit 1
-    fi
-    case $3 in
+    of=${3:-''}
+    case $of in
     servers)
-      echo -e "retrieving server(s) status"
+      echo_debug "retrieving server(s) status"
       nomad server members -detailed
       ;;
     clients)
       nodeid=${4:-''}
-      if [[ -z $nodeid ]]; then
-        echo -e 'retrieving client(s) status'
+      if test -z $nodeid; then
+        echo_debug 'retrieving client(s) status'
         nomad node status -verbose
-        exit 0
+      else
+        # $nodeid can be -self
+        echo_debug "retrieving status for client $nodeid"
+        nomad node status -verbose $nodeid
       fi
-      # $nodeid can be -self
-      echo -e "retrieving status for client $nodeid"
-      nomad node status -verbose $nodeid
       ;;
     all) nomad status ;;
     loc)
-      id=${4:-""}
-      if [[ -z $id ]]; then
-        echo 'syntax: `get status loc allocId`'
-        exit 1
-      fi
-      echo -e "getting status of allocation: $id"
+      id=${4:?allocation id required}
+      echo_debug "getting status of allocation: $id"
       nomad alloc status -verbose -stats $id
       ;;
     dep)
-      id=${4:-""}
-      if [[ -z $id ]]; then
-        echo 'syntax: `get status dep deployId`'
-        exit 1
-      fi
-      echo -e "getting status of deployment: $id"
+      id=${4:?deployment id required}
+      echo_debug "getting status of deployment: $id"
       nomad status $id
       ;;
-    job)
-      name=${4:-""}
-      if [[ -z $name ]]; then
-        echo 'syntax: `get status job jobName`'
-        exit 1
-      fi
+    stack)
+      name=${4:?stack name required}
       echo -e "getting status of $name"
       nomad job status $name
       ;;
-    *) echo -e $cmdhelp ;;
+    *) invalid_request ;;
     esac
     ;;
   logs)
@@ -223,52 +251,11 @@ get)
     echo -e "fetching logs for task $name in allocation $id"
     nomad alloc logs -f $id $name
     ;;
-  plan)
-    name=${3:-""}
-    if [[ -z $name ]]; then
-      echo 'syntax: `get plan jobName`'
-      exit 1
-    fi
-    if test ! -f "$ENV.$name.nomad"; then
-      echo -e "ensure jobspec $ENV.$name.nomad exists in current dir"
-      echo -e 'create a new job plan with `create job jobName`'
-      exit 1
-    fi
-
-    echo -e "creating job plan for $name"
-    echo -e "\tto use this script to submit the job"
-    echo -e "\texecute: run $name indexNumber"
-    nomad plan -var-file=.env.$ENV.compose.json "$ENV.$name.nomad"
-    ;;
-  *) echo -e $gethelp ;;
+  plan) get_stack_plan ${3:?stack name required} ;;
+  *) invalid_request ;;
   esac
   ;;
-run)
-  name=${2:-""}
-  index=${3:-""}
-  if [[ -z $name ]]; then
-    echo -e 'syntax: `run jobName [jobIndex]`'
-    exit 1
-  fi
-  if test ! -f "$ENV.$name.nomad"; then
-    echo -e "ensure jobspec $ENV.$name.nomad exists in current dir"
-    echo -e 'create a new job with `create job jobName`'
-    exit 1
-  fi
-  if [[ -z $index ]]; then
-    echo -e 'you should always use the jobIndex'
-    echo -e 'get the job index: `get plan jobName`'
-    echo -e 'syntax: `run jobName [jobIndex]`'
-    echo -e "running job $name anyway :("
-    nomad job run -var-file=.env.$ENV.compose.json $ENV.$name.nomad
-    exit $?
-  fi
-  echo -e "running job $name at index $index"
-  echo -e '\t job failures? get the allocation id from the job status'
-  echo -e '\t execute: get status job jobName'
-  echo -e '\t execute: get status loc allocId\n\n'
-  nomad job run -check-index $index -var-file=.env.$ENV.compose.json $ENV.$name.nomad
-  ;;
+run) run_stack ${2:?stack name required} ${3:?job index required} ;;
 rm)
   name=${2:-""}
   if [[ -z $name ]]; then
