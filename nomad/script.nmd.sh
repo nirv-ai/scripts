@@ -58,6 +58,11 @@ throw_missing_file $NOMAD_CLIENT_CERT 400 "all cmds require cli pem"
 throw_missing_file $NOMAD_CLIENT_KEY 400 "all cmds require cli key pem"
 
 ######################## FNS
+kill_nomad_service() {
+  # requires shell-init/services.sh
+  request_sudo 'kill service with name nomad'
+  kill_service_by_name nomad || true
+}
 sync_local_configs() {
   use_hashi_fmt || true
 
@@ -110,15 +115,25 @@ create_new_stack() {
   echo_debug "syncing nomad configs"
   sync_local_configs
 }
+get_stack_plan() {
+  name=${1:?stack name required}
+  # TODO: this should be APP_IAC_PATH when working
+  stack_file="${NOMAD_CONF_STACKS}/${name}.nomad"
+  env_file="${SCRIPTS_DIR_PARENT}/$name/.env.compose.json"
+
+  throw_missing_file $stack_file 404 'stack file doesnt exist'
+  throw_missing_file $env_file 404 'env file doesnt exist'
+
+  echo_debug "creating job plan for $name"
+  echo_debug "to use this script to submit the job"
+  echo_debug "execute: run $name indexNumber"
+  nomad plan -var-file=$env_file "$stack_file"
+}
 ######################## EXECUTE
 cmd=${1:-''}
 case $cmd in
 sync-confs) sync_local_configs ;;
-kill)
-  # requires shell-init/services.sh
-  request_sudo 'kill service with name nomad'
-  kill_service_by_name nomad || true
-  ;;
+kill) kill_nomad_service ;;
 gc)
   nomad system gc
   ;;
@@ -219,17 +234,7 @@ get)
     echo -e "fetching logs for task $name in allocation $id"
     nomad alloc logs -f $id $name
     ;;
-  plan)
-    name=${3:?stack name required}
-    stack_file="${NOMAD_CONF_STACKS}/${name}.nomad"
-
-    throw_missing_file $stack_file 404 'stack file doesnt exist'
-
-    echo -e "creating job plan for $name"
-    echo -e "\tto use this script to submit the job"
-    echo -e "\texecute: run $name indexNumber"
-    nomad plan -var-file=.env.compose.json "$ENV.$name.nomad"
-    ;;
+  plan) get_stack_plan ${3:?stack name required} ;;
   *) invalid_request ;;
   esac
   ;;
