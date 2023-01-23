@@ -125,8 +125,7 @@ get_stack_plan() {
   throw_missing_file $env_file 404 'env file doesnt exist'
 
   echo_debug "creating job plan for $name"
-  echo "to use this script to submit the job"
-  echo "execute: run $name indexNumber"
+  echo_info "execute this plan: run $name indexNumber"
   nomad plan -var-file=$env_file "$stack_file"
 }
 run_stack() {
@@ -141,12 +140,13 @@ run_stack() {
   throw_missing_file $env_file 404 'env file doesnt exist'
 
   echo_debug "running stack $name at index $index"
-  echo -e '\t job failures? get the allocation id from the job status'
-  echo -e '\t execute: get status job jobName'
-  echo -e '\t execute: get status loc allocId\n\n'
+  echo_debug '\t job failures? get the allocation id from the job status'
+  echo_debug '\t execute: get status job jobName'
+  echo_debug '\t execute: get status loc allocId\n\n'
   nomad job run -check-index $index -var-file=$env_file "$stack_file"
 }
 ######################## EXECUTE
+
 cmd=${1:-''}
 case $cmd in
 sync-confs) sync_local_configs ;;
