@@ -95,6 +95,21 @@ create_gossip_key() {
   mkdir -p $JAIL_MAD_KEYS
   nomad operator gossip keyring generate >$JAIL_KEY_GOSSIP
 }
+create_new_stack() {
+  name=${1:?stack name required}
+
+  echo_debug "creating new stack $name.nomad"
+  nomad job init -short "$name.nomad"
+
+  echo_debug "updating stack name in $name.nomad"
+  sed -i "/job \"example\"/c\job \"$name\" {" "$name.nomad"
+
+  echo_debug "moving stack $name.nomad to configs"
+  mv $name.nomad $NOMAD_CONF_STACKS/$name.nomad
+
+  echo_debug "syncing nomad configs"
+  sync_local_configs
+}
 ######################## EXECUTE
 cmd=${1:-''}
 case $cmd in
@@ -150,19 +165,8 @@ create)
   what=${2:-""}
   case $what in
   gossipkey) create_gossip_key ;;
-  job)
-    name=${3:-""}
-    if [[ -z $name ]]; then
-      echo 'syntax: `create job jobName`'
-      exit 1
-    fi
-
-    echo -e "creating new job $3.nomad in the current dir"
-    nomad job init -short "$ENV.$name.nomad"
-    echo -e "updating job name in $ENV.$name.nomad"
-    sudo sed -i "/job \"example\"/c\job \"$name\" {" "./$ENV.$name.nomad"
-    ;;
-  *) echo -e "syntax: create job|gossipkey." ;;
+  stack) create_new_stack ${3:?stack name required} ;;
+  *) invalid_request ;;
   esac
   ;;
 get)
