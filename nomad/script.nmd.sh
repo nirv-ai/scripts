@@ -104,28 +104,39 @@ gc)
   ;;
 start)
   type=${2:-''}
-  name=${3:?agent name required}
+  total=1 #${3:-1}
   conf_dir="$APP_IAC_NOMAD_DIR/$type"
   throw_missing_dir $conf_dir 400 "$conf_dir doesnt exist"
 
   # TODO: we need to add -dev-connect
   case $type in
   server)
-    request_sudo "starting nomad $type agent $name"
-    sudo -b nomad agent \
-      -config=$conf_dir \
-      -data-dir=/tmp/$name \
-      -encrypt=$(cat $JAIL_KEY_GOSSIP) \
-      -node=$type-$name.$(hostname) \
-      -server
+    request_sudo "starting $total nomad $type agent(s)"
+    declare -i i=0
+    while [ $i -lt $total ]; do
+      name=s$i
+      sudo -b nomad agent \
+        -bootstrap-expect=$total \
+        -config=$conf_dir \
+        -data-dir=/tmp/nomad/$name \
+        -encrypt=$(cat $JAIL_KEY_GOSSIP) \
+        -node=$type-$name.$(hostname) \
+        -server
+      i=$((i + 1))
+    done
     ;;
   client)
-    request_sudo "starting nomad $type agent $name"
-    sudo -b nomad agent \
-      -client \
-      -config=$conf_dir \
-      -data-dir=/tmp/$name \
-      -node=$type-$name.$(hostname)
+    request_sudo "starting $total nomad $type agent(s)"
+    declare -i i=0
+    while [ $i -lt $total ]; do
+      name=c$i
+      sudo -b nomad agent \
+        -client \
+        -config=$conf_dir \
+        -data-dir=/tmp/nomad/$name \
+        -node=$type-$name.$(hostname)
+      i=$((i + 1))
+    done
     ;;
   *) invalid_request ;;
   esac
