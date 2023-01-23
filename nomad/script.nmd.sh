@@ -170,67 +170,43 @@ create)
   esac
   ;;
 get)
-  gethelp='get status|logs|plan'
-  cmdname=${2:-""}
-  if [[ -z $cmdname ]]; then
-    echo -e $gethelp
-    exit 1
-  fi
-
+  cmdname=${2:-''}
   case $2 in
   status)
-    opts='servers|clients|all'
-    cmdhelp="get status of what? $opts"
-    ofwhat=${3:-""}
-    if [[ -z $ofwhat ]]; then
-      echo -e $cmdhelp
-      exit 1
-    fi
-    case $3 in
+    of=${3:-''}
+    case $of in
     servers)
-      echo -e "retrieving server(s) status"
+      echo_debug "retrieving server(s) status"
       nomad server members -detailed
       ;;
     clients)
       nodeid=${4:-''}
-      if [[ -z $nodeid ]]; then
-        echo -e 'retrieving client(s) status'
+      if test -z $nodeid; then
+        echo_debug 'retrieving client(s) status'
         nomad node status -verbose
-        exit 0
+      else
+        # $nodeid can be -self
+        echo_debug "retrieving status for client $nodeid"
+        nomad node status -verbose $nodeid
       fi
-      # $nodeid can be -self
-      echo -e "retrieving status for client $nodeid"
-      nomad node status -verbose $nodeid
       ;;
     all) nomad status ;;
     loc)
-      id=${4:-""}
-      if [[ -z $id ]]; then
-        echo 'syntax: `get status loc allocId`'
-        exit 1
-      fi
-      echo -e "getting status of allocation: $id"
+      id=${4:?allocation id required}
+      echo_debug "getting status of allocation: $id"
       nomad alloc status -verbose -stats $id
       ;;
     dep)
-      id=${4:-""}
-      if [[ -z $id ]]; then
-        echo 'syntax: `get status dep deployId`'
-        exit 1
-      fi
-      echo -e "getting status of deployment: $id"
+      id=${4:?deployment id required}
+      echo_debug "getting status of deployment: $id"
       nomad status $id
       ;;
-    job)
-      name=${4:-""}
-      if [[ -z $name ]]; then
-        echo 'syntax: `get status job jobName`'
-        exit 1
-      fi
+    stack)
+      name=${4:?stack name required}
       echo -e "getting status of $name"
       nomad job status $name
       ;;
-    *) echo -e $cmdhelp ;;
+    *) invalid_request ;;
     esac
     ;;
   logs)
@@ -244,23 +220,17 @@ get)
     nomad alloc logs -f $id $name
     ;;
   plan)
-    name=${3:-""}
-    if [[ -z $name ]]; then
-      echo 'syntax: `get plan jobName`'
-      exit 1
-    fi
-    if test ! -f "$ENV.$name.nomad"; then
-      echo -e "ensure jobspec $ENV.$name.nomad exists in current dir"
-      echo -e 'create a new job plan with `create job jobName`'
-      exit 1
-    fi
+    name=${3:?stack name required}
+    stack_file="${NOMAD_CONF_STACKS}/${name}.nomad"
+
+    throw_missing_file $stack_file 404 'stack file doesnt exist'
 
     echo -e "creating job plan for $name"
     echo -e "\tto use this script to submit the job"
     echo -e "\texecute: run $name indexNumber"
-    nomad plan -var-file=.env.$ENV.compose.json "$ENV.$name.nomad"
+    nomad plan -var-file=.env.compose.json "$ENV.$name.nomad"
     ;;
-  *) echo -e $gethelp ;;
+  *) invalid_request ;;
   esac
   ;;
 run)
