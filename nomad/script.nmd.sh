@@ -84,6 +84,11 @@ sync_local_configs() {
   for client_conf in "${client_configs[@]}"; do
     cp_to_dir $client_conf $iac_client_dir
   done
+
+  echo_debug 'copying nomad stacks'
+  local iac_stacks_dir="${APP_IAC_NOMAD_DIR}/stacks"
+  mkdir -p $iac_stacks_dir
+  cp_to_dir $NOMAD_CONF_STACKS $iac_stacks_dir
 }
 create_gossip_key() {
   echo_debug 'creating gossip key'
