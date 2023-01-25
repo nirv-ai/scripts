@@ -60,6 +60,7 @@ throw_missing_file $NOMAD_CLIENT_KEY 400 "all cmds require cli key pem"
 ######################## FNS
 kill_nomad_service() {
   # requires shell-init/services.sh
+  # TODO: this doesnt kill the client; only the server
   request_sudo 'kill service with name nomad'
   kill_service_by_name nomad || true
 }
@@ -146,6 +147,11 @@ run_stack() {
   nomad job run -check-index $index -var-file=$env_file "$stack_file"
 }
 ######################## EXECUTE
+
+# nomad alloc fs locId [dirName]
+# nomad alloc exec
+# nomad acl policy apply
+# nomad operator autopilot get-config
 
 cmd=${1:-''}
 case $cmd in
@@ -262,8 +268,8 @@ rm)
     echo -e 'syntax: `rm jobName`'
     exit 1
   fi
-  echo -e "purging job $name"
-  nomad job stop -purge $name
+  echo_info "purging job $name"
+  nomad job stop -purge $name || true
   ;;
 stop)
   name=${2:-""}
