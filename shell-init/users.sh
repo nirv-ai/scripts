@@ -39,6 +39,13 @@ create_group_system() {
 }
 export -f create_group_system
 
+create_user_system() {
+  user_name=${1:?system username required}
+
+  echo -e "sudo required: creating system user $user_name"
+  sudo useradd -r -s /sbin/nologin $user_name
+}
+export -f create_user_system
 # delete_user_and_group_system() {
 #   echo -e 'TODO: not implemented, @see delgroup -h'
 # }

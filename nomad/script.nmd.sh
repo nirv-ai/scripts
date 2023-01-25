@@ -2,6 +2,8 @@
 
 set -euo pipefail
 
+# TODO: focused on docker task driver: show sum luv to other plugins
+
 ######################## SETUP
 DOCS_URI='https://github.com/nirv-ai/docs/blob/main/nomad/README.md'
 SCRIPTS_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]%/}")" &>/dev/null && pwd)"
@@ -27,7 +29,7 @@ NOMAD_CONF_SERVER="${CONFIGS_DIR}/nomad/server"
 NOMAD_CONF_STACKS="${CONFIGS_DIR}/nomad/stacks"
 NOMAD_GOSSIP_FILENAME='server.gossip.key'
 NOMAD_SERVER_PORT="${NOMAD_SERVER_PORT:-4646}"
-
+NOMAD_DATA_DIR_BASE=/tmp/nomad
 export NOMAD_ADDR="${NOMAD_ADDR:-https://${MAD_HOSTNAME}:${NOMAD_SERVER_PORT}}"
 JAIL_KEY_GOSSIP="${JAIL_MAD_KEYS}/${NOMAD_GOSSIP_FILENAME}"
 
@@ -45,6 +47,7 @@ declare -A EFFECTIVE_INTERFACE=(
   [NOMAD_CONF_SERVER]=$NOMAD_CONF_SERVER
   [NOMAD_CONF_STACKS]=$NOMAD_CONF_STACKS
   [SCRIPTS_DIR_PARENT]=$SCRIPTS_DIR_PARENT
+  [NOMAD_DATA_DIR_BASE]=$NOMAD_DATA_DIR_BASE
 )
 
 ######################## CREDIT CHECK
@@ -152,6 +155,7 @@ run_stack() {
 # nomad alloc exec
 # nomad acl policy apply
 # nomad operator autopilot get-config
+# add this: https://github.com/hashicorp/damon
 
 cmd=${1:-''}
 case $cmd in
@@ -166,20 +170,25 @@ start)
   conf_dir="$APP_IAC_NOMAD_DIR/$type"
   throw_missing_dir $conf_dir 400 "$conf_dir doesnt exist"
 
+  mkdir -p $NOMAD_DATA_DIR_BASE
+  request_sudo "chowning $NOMAD_DATA_DIR_BASE"
+  sudo chown -R nomad:nomad $NOMAD_DATA_DIR_BASE
+
   # TODO: we need to add -dev-connect
+  # re-add sudo -b nomad... for users who havent added nomad to docker group
+  # ^ request_sudo "starting $total nomad $type agent(s)"
   case $type in
   server)
-    request_sudo "starting $total nomad $type agent(s)"
     declare -i i=0
     while [ $i -lt $total ]; do
       name=s$i
-      sudo -b nomad agent \
+      su - nomad -c "nomad agent \
         -bootstrap-expect=$total \
         -config=$conf_dir \
         -data-dir=/tmp/nomad/$name \
         -encrypt=$(cat $JAIL_KEY_GOSSIP) \
         -node=$type-$name.$(hostname) \
-        -server
+        -server"
       i=$((i + 1))
     done
     ;;
@@ -188,7 +197,7 @@ start)
     declare -i i=0
     while [ $i -lt $total ]; do
       name=c$i
-      sudo -b nomad agent \
+      nomad agent \
         -client \
         -config=$conf_dir \
         -data-dir=/tmp/nomad/$name \
