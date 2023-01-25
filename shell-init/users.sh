@@ -32,6 +32,7 @@ export -f get_group_users
 create_group_system() {
   group_name=${1:?'group name is required'}
   user_name=${2:-$USER}
+
   echo -e "sudo required: adding $user_name to system group $group_name\n"
 
   sudo groupadd -fr $group_name
@@ -43,9 +44,16 @@ create_user_system() {
   user_name=${1:?system username required}
 
   echo -e "sudo required: creating system user $user_name"
-  sudo useradd -r -s /sbin/nologin $user_name
+
+  create_group_system $user_name
+  sudo useradd -r -g $user_name -s /sbin/nologin $user_name
 }
 export -f create_user_system
-# delete_user_and_group_system() {
-#   echo -e 'TODO: not implemented, @see delgroup -h'
-# }
+
+rm_user() {
+  user_name=${1:?user name required}
+
+  echo -e "sudo required: deleting system user $user_name"
+
+  sudo deluser $user_name
+}
