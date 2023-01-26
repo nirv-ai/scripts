@@ -63,7 +63,7 @@ throw_missing_file $NOMAD_CLIENT_KEY 400 "all cmds require cli key pem"
 ######################## FNS
 kill_nomad_service() {
   # requires shell-init/services.sh
-  # TODO: this doesnt kill the client; only the server
+  # TODO: this doesnt seem to kill the client which is weird
   request_sudo 'kill service with name nomad'
   kill_service_by_name nomad || true
 }
@@ -258,7 +258,7 @@ get)
   logs)
     name=${3:?task name required}
     id=${4:?allocation id required}
-    echo -e "fetching logs for task $name in allocation $id"
+    echo_debug "fetching logs for task $name in allocation $id"
     nomad alloc logs -f $id $name
     ;;
   plan) get_stack_plan ${3:?stack name required} ;;
@@ -276,14 +276,25 @@ stop)
   echo -e "stopping job $name"
   nomad job stop $name
   ;;
+# TODO: move these to the dockerlogs.sh file
 dockerlogs)
   # @see https://stackoverflow.com/questions/36756751/view-logs-for-all-docker-containers-simultaneously
-  echo -e 'following logs for all running containers'
-  echo -e 'be sure to delete /tmp directory every so often'
+  echo_debug 'following logs for all running containers'
+  mkdir -p /tmp/dockerlogs
   for c in $(docker ps -a --format="{{.Names}}"); do
-    docker logs -f $c >/tmp/$c.log 2>/tmp/$c.err &
+    docker logs -f $c >/tmp/dockerlogs/$c.log 2>/tmp/dockerlogs/$c.err &
+    echo "$!" >/tmp/dockerlogs/$c.pid
   done
-  tail -f /tmp/*.{log,err}
+  tail -f /tmp/dockerlogs/*.{log,err}
+  ;;
+dockerlogs-kill)
+  for pidfile in /tmp/dockerlogs/*.pid; do
+    test -f $pidfile || break
+    this_pid=$(cat $pidfile)
+    echo_info "killing docker -f: pid $this_pid"
+    kill -9 $this_pid || true
+  done
+  rm /tmp/dockerlogs/*
   ;;
 *) invalid_request ;;
 esac
