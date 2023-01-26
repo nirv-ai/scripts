@@ -68,7 +68,7 @@ kill_nomad_service() {
   kill_service_by_name nomad || true
 }
 sync_local_configs() {
-  use_hashi_fmt || true
+  use_hashi_fmt ${CONFIGS_DIR}/nomad nomad
 
   local client_configs=(
     $NOMAD_CONF_CLIENT
