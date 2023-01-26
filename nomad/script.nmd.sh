@@ -63,12 +63,12 @@ throw_missing_file $NOMAD_CLIENT_KEY 400 "all cmds require cli key pem"
 ######################## FNS
 kill_nomad_service() {
   # requires shell-init/services.sh
-  # TODO: this doesnt kill the client; only the server
+  # TODO: this doesnt seem to kill the client which is weird
   request_sudo 'kill service with name nomad'
   kill_service_by_name nomad || true
 }
 sync_local_configs() {
-  use_hashi_fmt || true
+  use_hashi_fmt ${CONFIGS_DIR}/nomad nomad
 
   local client_configs=(
     $NOMAD_CONF_CLIENT
@@ -223,20 +223,20 @@ get)
     case $of in
     servers)
       echo_debug "retrieving server(s) status"
-      nomad server members -detailed
+      nomad server members -detailed -verbose
       ;;
     clients)
       nodeid=${4:-''}
       if test -z $nodeid; then
         echo_debug 'retrieving client(s) status'
-        nomad node status -verbose
+        nomad node status -verbose -json
       else
         # $nodeid can be -self
         echo_debug "retrieving status for client $nodeid"
         nomad node status -verbose $nodeid
       fi
       ;;
-    all) nomad status ;;
+    stacks) nomad status -verbose ;;
     loc)
       id=${4:?allocation id required}
       echo_debug "getting status of allocation: $id"
@@ -256,13 +256,9 @@ get)
     esac
     ;;
   logs)
-    name=${3:-""}
-    id=${4:-""}
-    if [[ -z $name || -z id ]]; then
-      echo -e 'syntax: `get logs taskName allocId`'
-      exit 1
-    fi
-    echo -e "fetching logs for task $name in allocation $id"
+    name=${3:?task name required}
+    id=${4:?allocation id required}
+    echo_debug "fetching logs for task $name in allocation $id"
     nomad alloc logs -f $id $name
     ;;
   plan) get_stack_plan ${3:?stack name required} ;;
@@ -271,31 +267,34 @@ get)
   ;;
 run) run_stack ${2:?stack name required} ${3:?job index required} ;;
 rm)
-  name=${2:-""}
-  if [[ -z $name ]]; then
-    echo -e 'syntax: `rm jobName`'
-    exit 1
-  fi
+  name=${2:?stack name required}
   echo_info "purging job $name"
   nomad job stop -purge $name || true
   ;;
 stop)
-  name=${2:-""}
-  if [[ -z $name ]]; then
-    echo -e 'syntax: `stop jobName`'
-    exit 1
-  fi
+  name=${2:?stack name is required}
   echo -e "stopping job $name"
   nomad job stop $name
   ;;
+# TODO: move these to the dockerlogs.sh file
 dockerlogs)
   # @see https://stackoverflow.com/questions/36756751/view-logs-for-all-docker-containers-simultaneously
-  echo -e 'following logs for all running containers'
-  echo -e 'be sure to delete /tmp directory every so often'
+  echo_debug 'following logs for all running containers'
+  mkdir -p /tmp/dockerlogs
   for c in $(docker ps -a --format="{{.Names}}"); do
-    docker logs -f $c >/tmp/$c.log 2>/tmp/$c.err &
+    docker logs -f $c >/tmp/dockerlogs/$c.log 2>/tmp/dockerlogs/$c.err &
+    echo "$!" >/tmp/dockerlogs/$c.pid
   done
-  tail -f /tmp/*.{log,err}
+  tail -f /tmp/dockerlogs/*.{log,err}
+  ;;
+dockerlogs-kill)
+  for pidfile in /tmp/dockerlogs/*.pid; do
+    test -f $pidfile || break
+    this_pid=$(cat $pidfile)
+    echo_info "killing docker -f: pid $this_pid"
+    kill -9 $this_pid || true
+  done
+  rm /tmp/dockerlogs/*
   ;;
 *) invalid_request ;;
 esac

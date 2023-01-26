@@ -250,6 +250,8 @@ create_cli_cert() {
   chmod_cert_files
 }
 create_p12_cert() {
+  throw_missing_program openssl 404 'openssl required for browser p12 certs'
+
   local cert_name=${1:-client-0}
   local use_ca_cn=${2:-$CA_CN}
   local this_jail_tls_dir="${JAIL}/${use_ca_cn}/tls"
