@@ -2,6 +2,8 @@
 
 set -euo pipefail
 
+# TODO: focused on docker task driver: will likely need exec in the near future
+
 ######################## SETUP
 DOCS_URI='https://github.com/nirv-ai/docs/blob/main/nomad/README.md'
 SCRIPTS_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]%/}")" &>/dev/null && pwd)"
@@ -27,7 +29,7 @@ NOMAD_CONF_SERVER="${CONFIGS_DIR}/nomad/server"
 NOMAD_CONF_STACKS="${CONFIGS_DIR}/nomad/stacks"
 NOMAD_GOSSIP_FILENAME='server.gossip.key'
 NOMAD_SERVER_PORT="${NOMAD_SERVER_PORT:-4646}"
-
+NOMAD_DATA_DIR_BASE=/tmp/nomad
 export NOMAD_ADDR="${NOMAD_ADDR:-https://${MAD_HOSTNAME}:${NOMAD_SERVER_PORT}}"
 JAIL_KEY_GOSSIP="${JAIL_MAD_KEYS}/${NOMAD_GOSSIP_FILENAME}"
 
@@ -45,6 +47,7 @@ declare -A EFFECTIVE_INTERFACE=(
   [NOMAD_CONF_SERVER]=$NOMAD_CONF_SERVER
   [NOMAD_CONF_STACKS]=$NOMAD_CONF_STACKS
   [SCRIPTS_DIR_PARENT]=$SCRIPTS_DIR_PARENT
+  [NOMAD_DATA_DIR_BASE]=$NOMAD_DATA_DIR_BASE
 )
 
 ######################## CREDIT CHECK
@@ -60,6 +63,7 @@ throw_missing_file $NOMAD_CLIENT_KEY 400 "all cmds require cli key pem"
 ######################## FNS
 kill_nomad_service() {
   # requires shell-init/services.sh
+  # TODO: this doesnt kill the client; only the server
   request_sudo 'kill service with name nomad'
   kill_service_by_name nomad || true
 }
@@ -147,6 +151,12 @@ run_stack() {
 }
 ######################## EXECUTE
 
+# nomad alloc fs locId [dirName]
+# nomad alloc exec
+# nomad acl policy apply
+# nomad operator autopilot get-config
+# add this: https://github.com/hashicorp/damon
+
 cmd=${1:-''}
 case $cmd in
 sync-confs) sync_local_configs ;;
@@ -160,6 +170,10 @@ start)
   conf_dir="$APP_IAC_NOMAD_DIR/$type"
   throw_missing_dir $conf_dir 400 "$conf_dir doesnt exist"
 
+  mkdir -p $NOMAD_DATA_DIR_BASE
+  # request_sudo "chowning $NOMAD_DATA_DIR_BASE"
+  # sudo chown -R nomad:nomad $NOMAD_DATA_DIR_BASE
+
   # TODO: we need to add -dev-connect
   case $type in
   server)
@@ -170,7 +184,7 @@ start)
       sudo -b nomad agent \
         -bootstrap-expect=$total \
         -config=$conf_dir \
-        -data-dir=/tmp/nomad/$name \
+        -data-dir=$NOMAD_DATA_DIR_BASE/$name \
         -encrypt=$(cat $JAIL_KEY_GOSSIP) \
         -node=$type-$name.$(hostname) \
         -server
@@ -185,7 +199,7 @@ start)
       sudo -b nomad agent \
         -client \
         -config=$conf_dir \
-        -data-dir=/tmp/nomad/$name \
+        -data-dir=$NOMAD_DATA_DIR_BASE/$name \
         -node=$type-$name.$(hostname)
       i=$((i + 1))
     done
@@ -262,8 +276,8 @@ rm)
     echo -e 'syntax: `rm jobName`'
     exit 1
   fi
-  echo -e "purging job $name"
-  nomad job stop -purge $name
+  echo_info "purging job $name"
+  nomad job stop -purge $name || true
   ;;
 stop)
   name=${2:-""}
