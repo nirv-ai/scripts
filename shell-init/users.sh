@@ -29,14 +29,21 @@ get_group_users() {
 }
 export -f get_group_users
 
-create_group_system() {
+add_user_to_group() {
   group_name=${1:?'group name is required'}
   user_name=${2:-$USER}
 
   echo -e "sudo required: adding $user_name to system group $group_name\n"
+  sudo usermod -aG $group_name $user_name
+}
+create_group_system() {
+  group_name=${1:?'group name is required'}
+  user_name=${2:-$USER}
+
+  echo -e "sudo required: creating system group $group_name\n"
 
   sudo groupadd -fr $group_name
-  sudo usermod -aG $group_name $user_name
+  add_user_to_group $group_name $user_name
 }
 export -f create_group_system
 
@@ -57,3 +64,4 @@ rm_user() {
 
   sudo deluser $user_name
 }
+export -f rm_user

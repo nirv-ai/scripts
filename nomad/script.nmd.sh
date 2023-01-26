@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-# TODO: focused on docker task driver: show sum luv to other plugins
+# TODO: focused on docker task driver: will likely need exec in the near future
 
 ######################## SETUP
 DOCS_URI='https://github.com/nirv-ai/docs/blob/main/nomad/README.md'
@@ -171,24 +171,23 @@ start)
   throw_missing_dir $conf_dir 400 "$conf_dir doesnt exist"
 
   mkdir -p $NOMAD_DATA_DIR_BASE
-  request_sudo "chowning $NOMAD_DATA_DIR_BASE"
-  sudo chown -R nomad:nomad $NOMAD_DATA_DIR_BASE
+  # request_sudo "chowning $NOMAD_DATA_DIR_BASE"
+  # sudo chown -R nomad:nomad $NOMAD_DATA_DIR_BASE
 
   # TODO: we need to add -dev-connect
-  # re-add sudo -b nomad... for users who havent added nomad to docker group
-  # ^ request_sudo "starting $total nomad $type agent(s)"
   case $type in
   server)
+    request_sudo "starting $total nomad $type agent(s)"
     declare -i i=0
     while [ $i -lt $total ]; do
       name=s$i
-      su - nomad -c "nomad agent \
+      sudo -b nomad agent \
         -bootstrap-expect=$total \
         -config=$conf_dir \
-        -data-dir=/tmp/nomad/$name \
+        -data-dir=$NOMAD_DATA_DIR_BASE/$name \
         -encrypt=$(cat $JAIL_KEY_GOSSIP) \
         -node=$type-$name.$(hostname) \
-        -server"
+        -server
       i=$((i + 1))
     done
     ;;
@@ -197,10 +196,10 @@ start)
     declare -i i=0
     while [ $i -lt $total ]; do
       name=c$i
-      nomad agent \
+      sudo -b nomad agent \
         -client \
         -config=$conf_dir \
-        -data-dir=/tmp/nomad/$name \
+        -data-dir=$NOMAD_DATA_DIR_BASE/$name \
         -node=$type-$name.$(hostname)
       i=$((i + 1))
     done
