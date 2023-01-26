@@ -256,12 +256,8 @@ get)
     esac
     ;;
   logs)
-    name=${3:-""}
-    id=${4:-""}
-    if [[ -z $name || -z id ]]; then
-      echo -e 'syntax: `get logs taskName allocId`'
-      exit 1
-    fi
+    name=${3:?task name required}
+    id=${4:?allocation id required}
     echo -e "fetching logs for task $name in allocation $id"
     nomad alloc logs -f $id $name
     ;;
@@ -271,20 +267,12 @@ get)
   ;;
 run) run_stack ${2:?stack name required} ${3:?job index required} ;;
 rm)
-  name=${2:-""}
-  if [[ -z $name ]]; then
-    echo -e 'syntax: `rm jobName`'
-    exit 1
-  fi
+  name=${2:?stack name required}
   echo_info "purging job $name"
   nomad job stop -purge $name || true
   ;;
 stop)
-  name=${2:-""}
-  if [[ -z $name ]]; then
-    echo -e 'syntax: `stop jobName`'
-    exit 1
-  fi
+  name=${2:?stack name is required}
   echo -e "stopping job $name"
   nomad job stop $name
   ;;
