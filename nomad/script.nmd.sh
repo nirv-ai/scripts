@@ -223,20 +223,20 @@ get)
     case $of in
     servers)
       echo_debug "retrieving server(s) status"
-      nomad server members -detailed
+      nomad server members -detailed -verbose
       ;;
     clients)
       nodeid=${4:-''}
       if test -z $nodeid; then
         echo_debug 'retrieving client(s) status'
-        nomad node status -verbose
+        nomad node status -verbose -json
       else
         # $nodeid can be -self
         echo_debug "retrieving status for client $nodeid"
         nomad node status -verbose $nodeid
       fi
       ;;
-    all) nomad status ;;
+    stacks) nomad status -verbose ;;
     loc)
       id=${4:?allocation id required}
       echo_debug "getting status of allocation: $id"
