@@ -87,7 +87,7 @@ sync_local_configs() {
     cp_to_dir $server_conf $iac_server_dir
   done
 
-  echo_debug 'syncing nomad server confs'
+  echo_debug 'syncing nomad client confs'
   local iac_client_dir="${APP_IAC_NOMAD_DIR}/client"
   mkdir -p $iac_client_dir
   for client_conf in "${client_configs[@]}"; do
