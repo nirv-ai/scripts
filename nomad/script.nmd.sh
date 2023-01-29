@@ -218,6 +218,11 @@ create)
 get)
   cmdname=${2:-''}
   case $2 in
+  services) nomad service list ;;
+  service)
+    srvc_name=${3:?service name required}
+    nomad service info -verbose -json $srvc_name
+    ;;
   status)
     of=${3:-''}
     case $of in
