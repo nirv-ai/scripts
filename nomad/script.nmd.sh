@@ -86,6 +86,8 @@ sync_local_configs() {
   for server_conf in "${server_configs[@]}"; do
     cp_to_dir $server_conf $iac_server_dir
   done
+  # validate copied server confs
+  nomad config validate $iac_server_dir || true
 
   echo_debug 'syncing nomad client confs'
   local iac_client_dir="${APP_IAC_NOMAD_DIR}/client"
@@ -93,6 +95,8 @@ sync_local_configs() {
   for client_conf in "${client_configs[@]}"; do
     cp_to_dir $client_conf $iac_client_dir
   done
+  # validate copied client confs
+  nomad config validate $iac_client_dir || true
 
   echo_debug 'copying nomad stacks'
   local iac_stacks_dir="${APP_IAC_NOMAD_DIR}/stacks"
@@ -149,24 +153,9 @@ run_stack() {
   echo_debug '\t execute: get status loc allocId\n\n'
   nomad job run -check-index $index -var-file=$env_file "$stack_file"
 }
-######################## EXECUTE
-
-# nomad alloc fs locId [dirName]
-# nomad alloc exec
-# nomad acl policy apply
-# nomad operator autopilot get-config
-# add this: https://github.com/hashicorp/damon
-
-cmd=${1:-''}
-case $cmd in
-sync-confs) sync_local_configs ;;
-kill) kill_nomad_service ;;
-gc)
-  nomad system gc
-  ;;
-start)
-  type=${2:-''}
-  total=1 #${3:-1}
+start_agent() {
+  type=${1:?either server|client agent must be specified}
+  total=${2:-1}
   conf_dir="$APP_IAC_NOMAD_DIR/$type"
   throw_missing_dir $conf_dir 400 "$conf_dir doesnt exist"
 
@@ -206,59 +195,86 @@ start)
     ;;
   *) invalid_request ;;
   esac
-  ;;
+}
+######################## EXECUTE
+
+# nomad alloc fs locId [dirName]
+# nomad alloc exec
+# nomad acl policy apply
+# nomad operator autopilot get-config
+# nomad job history -p job_name # todo
+# add this: https://github.com/hashicorp/damon
+
+cmd=${1:-''}
+case $cmd in
+sync-confs) sync_local_configs ;;
+kill) kill_nomad_service ;;
+gc) nomad system gc ;;
+start) start_agent ${2:?'agent type server|client required'} ;;
 create)
   what=${2:-""}
   case $what in
   gossipkey) create_gossip_key ;;
   stack) create_new_stack ${3:?stack name required} ;;
+  plan) get_stack_plan ${3:?stack name required} ;;
   *) invalid_request ;;
   esac
   ;;
 get)
   cmdname=${2:-''}
   case $2 in
-  services) nomad service list ;;
+  self) nomad agent-info -json ;;
   service)
-    srvc_name=${3:?service name required}
-    nomad service info -verbose -json $srvc_name
+    srvc_name=${3:-''}
+    if test -z $srvc_name; then
+      nomad service list -json
+    else
+      nomad service info -verbose -json $srvc_name
+    fi
     ;;
-  status)
-    of=${3:-''}
-    case $of in
-    servers)
-      echo_debug "retrieving server(s) status"
-      nomad server members -detailed -verbose
-      ;;
-    clients)
-      nodeid=${4:-''}
-      if test -z $nodeid; then
-        echo_debug 'retrieving client(s) status'
-        nomad node status -verbose -json
-      else
-        # $nodeid can be -self
-        echo_debug "retrieving status for client $nodeid"
-        nomad node status -verbose $nodeid
-      fi
-      ;;
-    stacks) nomad status -verbose ;;
-    loc)
-      id=${4:?allocation id required}
-      echo_debug "getting status of allocation: $id"
-      nomad alloc status -verbose -stats $id
-      ;;
-    dep)
-      id=${4:?deployment id required}
-      echo_debug "getting status of deployment: $id"
-      nomad status $id
-      ;;
-    stack)
-      name=${4:?stack name required}
-      echo -e "getting status of $name"
-      nomad job status $name
-      ;;
-    *) invalid_request ;;
-    esac
+  server) nomad server members -verbose ;;
+  client)
+    nodeid=${3:-''}
+    if test -z $nodeid; then
+      echo_debug 'retrieving client(s) status'
+      nomad node status -verbose -json
+    else
+      # $nodeid can be -self if executed on a client agent
+      echo_debug "retrieving status for client $nodeid"
+      nomad node status -verbose -json $nodeid
+    fi
+    ;;
+  stack)
+    stack_name=${3:-''}
+    if test -z $stack_name; then
+      nomad status -verbose
+    else
+      nomad job status -verbose $stack_name
+    fi
+    ;;
+  loc)
+    id=${3:-''}
+    if test -z $id; then
+      nomad alloc status -json
+    else
+      nomad alloc status -verbose -stats -json $id
+    fi
+    ;;
+  eval)
+    id=${3:-''}
+    if test -z $id; then
+      nomad eval list -json
+    else
+      nomad eval status -verbose -json $id
+    fi
+    ;;
+  dep)
+    id=${3:-''}
+    if test -z $id; then
+      nomad deployment list -verbose -json
+    else
+      nomad deployment status -verbose -json $id
+    fi
     ;;
   logs)
     name=${3:?task name required}
@@ -266,15 +282,13 @@ get)
     echo_debug "fetching logs for task $name in allocation $id"
     nomad alloc logs -f $id $name
     ;;
-  plan) get_stack_plan ${3:?stack name required} ;;
   *) invalid_request ;;
   esac
   ;;
 run) run_stack ${2:?stack name required} ${3:?job index required} ;;
-rm)
+rm) # this purges the job, but doesnt stop the running containers
   name=${2:?stack name required}
-  echo_info "purging job $name"
-  nomad job stop -purge $name || true
+  nomad job stop -purge -yes $name || true
   ;;
 stop)
   name=${2:?stack name is required}
