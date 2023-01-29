@@ -86,7 +86,8 @@ sync_local_configs() {
   for server_conf in "${server_configs[@]}"; do
     cp_to_dir $server_conf $iac_server_dir
   done
-  # validate copied server confs
+
+  echo_info "validating confs: $iac_server_dir"
   nomad config validate $iac_server_dir || true
 
   echo_debug 'syncing nomad client confs'
@@ -95,7 +96,8 @@ sync_local_configs() {
   for client_conf in "${client_configs[@]}"; do
     cp_to_dir $client_conf $iac_client_dir
   done
-  # validate copied client confs
+
+  echo_info "validating confs: $iac_client_dir"
   nomad config validate $iac_client_dir || true
 
   echo_debug 'copying nomad stacks'
@@ -125,7 +127,7 @@ create_new_stack() {
 }
 get_stack_plan() {
   name=${1:?stack name required}
-  # TODO: this should be APP_IAC_PATH when working
+  # TODO: this should be APP_IAC_PATH or whaetver when working
   stack_file="${NOMAD_CONF_STACKS}/${name}.nomad"
   env_file="${SCRIPTS_DIR_PARENT}/$name/.env.compose.json"
 
@@ -140,7 +142,7 @@ run_stack() {
   name=${1:?stack name required}
   index=${2:?index required}
 
-  # TODO: this should be APP_IAC_PATH when working
+  # TODO: this should be APP_IAC_PATH or whatever when working
   stack_file="${NOMAD_CONF_STACKS}/${name}.nomad"
   env_file="${SCRIPTS_DIR_PARENT}/$name/.env.compose.json"
 
