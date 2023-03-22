@@ -50,6 +50,11 @@ do_response_dos() {
 }
 export -f do_response_dos
 
+list_open_ports() {
+  nmap ${1:?ip addr/localhost required}
+}
+export -f list_open_ports
+
 list_connections() {
   sudo netstat -tulpn
 }
@@ -57,6 +62,7 @@ export -f list_connections
 
 list_listeners() {
   netstat -lt
+  # ss -ltnp
 }
 export -f list_listeners
 
