@@ -97,3 +97,9 @@ dk_stop_rm_cunts() {
   docker ps -aq | xargs docker stop | xargs docker rm
 }
 export -f dk_stop_rm_cunts
+
+dk_d_restart() {
+  sudo systemctl daemon-reload
+  sudo systemctl restart docker
+}
+export -f dk_d_restart

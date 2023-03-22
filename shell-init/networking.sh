@@ -10,6 +10,11 @@ get_hosts() {
 }
 export -f get_hosts
 
+get_port_status() {
+  nc -z 127.0.0.1 ${1:?port number required} && echo "IN USE" || echo "FREE"
+}
+export -f get_port_status
+
 get_networks() {
   getent networks
 }
@@ -45,10 +50,21 @@ do_response_dos() {
 }
 export -f do_response_dos
 
+list_open_ports() {
+  nmap ${1:?ip addr/localhost required}
+}
+export -f list_open_ports
+
 list_connections() {
   sudo netstat -tulpn
 }
 export -f list_connections
+
+list_listeners() {
+  netstat -lt
+  # ss -ltnp
+}
+export -f list_listeners
 
 whats_my_ip_mac() {
   ifconfig -a | grep inet
