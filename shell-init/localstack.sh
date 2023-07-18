@@ -25,4 +25,3 @@ saml() {
   # @see https://github.com/localstack/aws-sam-cli-local
   samlocal "$@"
 }
-
