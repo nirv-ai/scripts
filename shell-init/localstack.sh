@@ -22,5 +22,6 @@ tfl() {
 }
 
 saml() {
+  # @see pip install aws-sam-cli-local
   samlocal "$@"
 }
