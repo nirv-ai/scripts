@@ -22,6 +22,7 @@ tfl() {
 }
 
 saml() {
-  # @see pip install aws-sam-cli-local
+  # @see https://github.com/localstack/aws-sam-cli-local
   samlocal "$@"
 }
+
