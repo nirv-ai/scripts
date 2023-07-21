@@ -21,6 +21,8 @@ export -f aws_profile_list
 aws_accounts() {
   aws iam list-account-aliases
 }
+export -f aws_accounts
+
 aws_whoami() {
   aws sts get-caller-identity
 }
