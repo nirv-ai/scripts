@@ -2,6 +2,7 @@
 
 ## TODOs:
 ### move this into nirv-ai/scripts once its all setup
+### we're going to have to duplicate a bunch of fns until this is fixed: https://github.com/aws/aws-cli/issues/8052
 
 ######################## aws local
 awsl() {
@@ -20,13 +21,14 @@ awsl() {
   # aws_access_key_id=test
   # aws_secret_access_key=test
 
+  export AWS_PROFILE=localstack
   export AWS_ACCESS_KEY_ID=$(aws configure get aws_access_key_id --profile localstack)
   export AWS_SECRET_ACCESS_KEY=$(aws configure get aws_secret_access_key --profile localstack)
   export AWS_DEFAULT_REGION=$(aws configure get region --profile localstack)
   export AWS_ENDPOINT_URL=$(aws configure get endpoint_url --profile localstack)
 
   # for some reason this fails if we rely on AWS_ENDPOINT_URL env var
-  aws --endpoint-url=http://${LOCALSTACK_HOST:-localhost}:4566 "$@"
+  aws --endpoint-url=$AWS_ENDPOINT_URL "$@"
 }
 
 ######################## localstack
