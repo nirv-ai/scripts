@@ -112,12 +112,14 @@ aws_profile_to_env_vars() {
     return 1
   fi
 
+  # required
   export AWS_ACCESS_KEY_ID=$(aws configure get aws_access_key_id --profile $1)
   export AWS_SECRET_ACCESS_KEY=$(aws configure get aws_secret_access_key --profile $1)
-  export AWS_DEFAULT_REGION=$(aws configure get region --profile $1)
   export AWS_SESSION_TOKEN=$(aws configure get aws_session_token --profile "$1")
-  export AWS_SECURITY_TOKEN=$(aws configure get aws_security_token --profile "$1")
-  export AWS_ENDPOINT_URL=$(aws configure get endpoint_url --profile "$1")
+  # we need to set truthy checks around these
+  # export AWS_DEFAULT_REGION=$(aws configure get region --profile $1)
+  # export AWS_SECURITY_TOKEN=$(aws configure get aws_security_token --profile "$1")
+  # export AWS_ENDPOINT_URL=$(aws configure get endpoint_url --profile "$1")
 
   aws_whoami
 }
